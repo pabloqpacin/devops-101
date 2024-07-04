@@ -20,4 +20,10 @@ Vagrant.configure("2") do |config|
  
     config.vm.synced_folder ".", "vagrant", disabled: true
     # config.vm.synced_folder '/host/path', '/guest/path', SharedFoldersEnableSymlinksCreate: false
+
+    config.vm.provision "ansible" do |ansible|
+        ansible.playbook = "../ansible/site.yml"
+        ansible.compatibility_mode = "2.0"
+    end
+
 end
