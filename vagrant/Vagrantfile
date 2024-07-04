@@ -1,0 +1,23 @@
+Vagrant.configure("2") do |config|
+    config.vm.box = "ubuntu/jammy64"
+    config.vm.hostname = "vag-ubu2204"
+
+    # config.vm.provision "shell", inline: <<-SHELL
+    #     VBoxManage setproperty machinefolder /media/$USER/LAB/VBox
+    # SHELL
+
+    # config.vm.network "private_network", type: "dhcp"
+    config.vm.network "public_network", bridge: "enp2s0"
+
+    config.vm.provider "virtualbox" do |vb|
+        vb.name = "vag-ubu2204"
+        vb.memory = "2048"
+        vb.cpus = 2
+        # vb.customize ["movevm", :id, "--folder", "/media/pabloqpacin/LAB/VBox"] # solo funciona la primera vez...
+        # vb.customize ["modifyvm", :id, "--uart1", "0x3F8", "4"]
+        # vb.customize ["modifyvm", :id, "--uartmode1", "file", File::NULL]
+    end
+ 
+    config.vm.synced_folder ".", "vagrant", disabled: true
+    # config.vm.synced_folder '/host/path', '/guest/path', SharedFoldersEnableSymlinksCreate: false
+end
