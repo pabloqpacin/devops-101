@@ -11,10 +11,11 @@ if command -v vagrant &>/dev/null; then
     esac
 fi
 
-### VM storage (need to mount partition in Acer EX2511)
+### Hardware/VirtualBox VMs storage
 if command -v vagrant &>/dev/null; then
-    if lsblk -f | grep -q 'LAB' && [ ! -d /media/$USER/LAB ]; then
-        # Desafío: necesario login en GUI por tema dbus... si fuera server, montar la partición con persistencia -- https://stackoverflow.com/questions/483460/how-to-mount-from-command-line-like-the-nautilus-does
+    if lsblk -f | grep -q 'LAB' && [ ! -d /media/$USER/LAB/VBox ]; then
+        # FIXME: necesario login en GUI por tema dbus... -- https://stackoverflow.com/questions/483460/how-to-mount-from-command-line-like-the-nautilus-does
+        # DONE: hemos dado persistencia al montaje (ver ../README.md), con lo que este código no debería ejecutarse
         gio mount -d /dev/sdb2                                                  # gio mount -u /media/$USER/LAB
     fi
 

@@ -8,19 +8,20 @@
   - [Proyectos](#proyectos)
     - [Proyecto 1. Vagrant + Ansible](#proyecto-1-vagrant--ansible)
       - [1.1 Instalación de Vagrant y Ansible](#11-instalación-de-vagrant-y-ansible)
-      - [1.2 Configuración de Vagrant y del hardware (script `vagrant_vbox_env.sh`)](#12-configuración-de-vagrant-y-del-hardware-script-vagrant_vbox_envsh)
+      - [1.2 Configuraciones: hardware, VirtualBox, Vagrant](#12-configuraciones-hardware-virtualbox-vagrant)
       - [1.3 Implementación del `Vagrantfile`](#13-implementación-del-vagrantfile)
+      - [1.4 Ansible...](#14-ansible)
 
 
 ## Entornos de desarrollo y operaciones
 
 Nuestro hardware:
 
-| Máquina       | CPU                       | RAM   | Almacenamiento                            | OS            | ¿Multiboot?
-| ---           | ---                       | ---   | ---                                       | ---           | ---
-| Acer EX2511   | i5-4210U (4) @ 2.70 GHz   | 16 GB | 1x240GB SSD<br> 1x480 SSD                 | Pop!_OS 22.04 | Sí, con Arch Linux
-| **MSI GL76**  | i7-11800H (16) @ 4.60 GHz | 32 GB | 1x2TB NVMe<br> 1x1TB NVMe<br> 1x1TB HDD   | Pop!_OS 22.04 | No
-| **Pi 5**      | ...                       | ...   | ...                                       | ...           | No
+| Máquina       | Procesador                    | RAM   | Almacenamiento                            | OS            | ¿Multiboot?
+| ---           | ---                           | ---   | ---                                       | ---           | ---
+| Acer EX2511   | i5-4210U (4)<br> @ 2.70 GHz   | 16GB | 1x240GB SSD<br> 1x480 SSD                  | Pop!_OS 22.04 | Arch Linux
+| **MSI GL76**  | i7-11800H (16)<br> @ 4.60 GHz | 32GB | 1x2TB NVMe<br> 1x1TB NVMe<br> 1x1TB HDD    | Pop!_OS 22.04 | No
+| **Pi 5**      | ...                           | ...   | ...                                       | ...           | No
  
 
 <!--
@@ -102,7 +103,7 @@ Tecnologías que queremos aprender:
 
 ## Proyectos
 
-Directamente clonamos este repo remoto en nuestra máquina de operaciones:
+**IMPORTANTE**: <u>clonar el repo</u> para manejar los archivos de los proyectos.
 
 ```bash
 git clone https://github.com/pabloqpacin/devops_101.git $HOME/devops_101
@@ -113,37 +114,45 @@ git clone https://github.com/pabloqpacin/devops_101.git $HOME/devops_101
 <!-- - [ ] [/vagrant](/vagrant/)
 - [ ] [/ansible](/ansible/) -->
 
-Nuestro entorno es la máquina *Acer EX2511*. Pilota el sistema *Pop!_OS* (derivado de Ubuntu). Nos conectaremos a esta máquina desde nuestra máquina principal *MSI GL76* mediante `ssh`.
+Nuestra máquina de operaciones es la *Acer EX2511*, a la cual nos conectaremos desde la de desarrollo *MSI GL76* mediante `ssh`. Ambas están en nuestra red local y pilotan el sistema operativo *Pop!_OS* (derivado de Ubuntu).
 
-No queremos almacenar las VMs en la partición `/` (en `/dev/sdb1`) sino en otra partición (`/dev/sdb2`), que montaremos según su *label* `LAB` en el directorio `/media/$USER/LAB`. Actualmente el montaje se realiza mediante el comando `gio mount -d /dev/sdb2` que por desgracia requiere iniciar una sesión gráfica, por lo que para entornos remotos (sin GUI) habría que revisar este procedimiento de montaje.
+La máquina *Acer EX2511* tiene el OS instalado en `/dev/sdb1` (es decir, la partición root o `/`). Previamente hemos creado la partición `/dev/sdb2` con idea de almacenar VMs. Aunque no es necesario, decidimos dar persistencia al montaje de particiones con los siguientes comandos.
 
+```bash
+sudo mkdir -p /media/$USER/LAB
+UUID=$(blkid /dev/sdb2 | awk '{print $3}' | awk -F '=' '{print $2}' | tr -d '"')
+echo "UUID=$UUID /media/$USER/LAB ext4 defaults 0  2" | \
+    sudo tee -a /etc/fstab
+sudo mount -a
+# df -h | grep /media/$USER/LAB
+```
+
+<!-- En este caso queremos almacenar las VMs en una partición aparte (`/dev/sdb2` con *label* `LAB`), que habrá que montar en la partición `/` (`/dev/sdb1`). El punto de montaje definido para este proyecto es `/media/$USER/LAB`. (Realizaremos la operación al arrancar la máquina mediante el comando `gio mount -d /dev/sdb2`). -->
+
+<!-- > El comando `gio mount -d /dev/sdb2` requiere iniciar sesión en la GUI de escritorio (eg. Gnome), por lo que para entornos remotos sin GUI habría que revisar este procedimiento de montaje. -->
 
 #### 1.1 Instalación de Vagrant y Ansible
 
-Primero de todo, instalamos **Vagrant** (Ubuntu/Debian).
+Instalamos **Vagrant** (Ubuntu/Debian).
 
 <!--
 ```bash
-install_vagrant(){
-    if command -v vagrant &>/dev/null; then
-        echo "Vagrant is already installed."
-    else
-        DISTRO=$(grep 'ID_LIKE' /etc/os-release | awk -F '=' '{print $2}' | tr -d '"')
-        case $DISTRO in
-            'ubuntu debian' | 'ubuntu' | 'debian')
-                wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-                echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-                sudo apt update && sudo apt install vagrant
-                ;;
-            *)
-                echo "Distro not supported. Terminating script."
-                exit 1
-                ;;
-        esac
-    fi
-}
-
-install_vagrant
+if command -v vagrant &>/dev/null; then
+    echo "Vagrant is already installed."
+else
+    DISTRO=$(grep 'ID_LIKE' /etc/os-release | awk -F '=' '{print $2}' | tr -d '"')
+    case $DISTRO in
+        'ubuntu debian' | 'ubuntu' | 'debian')
+            wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+            echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+            sudo apt update && sudo apt install vagrant
+            ;;
+        *)
+            echo "Distro not supported. Terminating script."
+            exit 1
+            ;;
+    esac
+fi
 ```
 -->
 
@@ -154,7 +163,7 @@ echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://
 sudo apt update && sudo apt install vagrant
 ```
 
-No es necesario instalar **Ansible** para operar con Vagrant, pero dado que nuestro `Vagrantfile` hace uso de Ansible, mejor instalarlo ya (Ubuntu/Debian). Si no lo instalamos, habrá que comentar las líneas relevantes del `Vagrantfile`.
+Instalar **Ansible** no es necesario para operar con Vagrant, pero dado que nuestro `Vagrantfile` hace uso de Ansible, mejor instalarlo ya (Ubuntu/Debian). Si no lo hacemos, habría que comentar las líneas relevantes del `Vagrantfile`.
 
 ```bash
 sudo apt update
@@ -164,9 +173,13 @@ sudo apt install -y ansible
 ```
 
 
-#### 1.2 Configuración de Vagrant y del hardware (script `vagrant_vbox_env.sh`)
+#### 1.2 Configuraciones: hardware, VirtualBox, Vagrant
 
-Hemos preparado [un script](/vagrant/vagrant_vbox_env.sh) que se asegura de que el hardware/almacenamiento de las VMs está montado y la variable `$VAGRANT_HOME` tiene el valor `/var/vagrant.d` (donde se almacenarán los archivos de configuración de **Vagrant**).
+Hemos preparado [el script `vagrant_vbox_env.sh`](/vagrant/vagrant_vbox_env.sh) para realizar varias tareas importantes.
+
+1. Asignar a la variable de entorno `$VAGRANT_HOME` el valor `/var/vagrant.d` (por defecto sería `~/.vagrant.d`). Aquí se almacenarán varios archivos de configuración de **Vagrant**. Cada imagen o *box* que descarguemos pesará medio GB así que puede llegar a pesar mucho y preferimos dejar este tipo de *bloat* fuera de `/home`.
+
+<!-- La primera es asignar a la variable de entorno que se asegura de que el hardware/almacenamiento de las VMs de VirtualBox está montado y de que la variable `$VAGRANT_HOME` tiene el valor `/var/vagrant.d` (donde se almacenarán los archivos de configuración de **Vagrant**). -->
 
 <!-- Primero descargamos el script y lo guardamos como `~/vagrant_vbox_env.sh`. Si hemos clonado el repositorio también podríamos copiarlo o hacer un symlink en local.
 
@@ -175,19 +188,22 @@ curl -so ~/vagrant_vbox_env.sh \
     https://raw.githubusercontent.com/pabloqpacin/devops-101/main/vagrant/vagrant_vbox_env_sh
 ``` -->
 
+<!-- Si la configuración de hardware/particiones es distinta o simplemente queremos cambiar el directorio por defecto donde **VirtualBox** almacenará las VMs, habrá que modificar este comando del script y verificar que se montan tales particiones/directorios. -->
 
-Si la configuración de hardware/particiones es distinta o simplemente queremos cambiar el directorio por defecto donde **VirtualBox** almacenará las VMs, habrá que modificar este comando del script y verificar que se monta tal directorio/partición.
+2. Queremos almacenar las VMs en la partición `/dev/sdb2` montada como `/media/$USER/LAB` de forma persistente. Igualmente verificamos que la partición está montada y si no es así se intenta mediante con el comando `gio mount -d /dev/sdb2`. Desafortunadamente este comando requiere iniciar la sesión gráfica de escritorio tipo Gnome, Cosmic...
+
+3. Finalmente, revisamos y definimos el directorio donde **VirtualBox** almacenará por defecto las VMs. 
 
 ```bash
 # VBoxManage list systemproperties | grep "Default machine folder" 
-VBoxManage setproperty machinefolder ...
+VBoxManage setproperty machinefolder /media/$USER/LAB/VBox
 ```
 
-Para aseguramos de que el script será ejecutado cada vez que iniciemos la shell, introducimos este comando que añadirá la línea `source ~/vagrant_vbox_env.sh` a nuestro `~/.zshrc` o `~/.bashrc`.
+Hacemos que la shell (*zsh* o *bash*) ejecute nuestro script verificador al iniciarse.
 
 ```bash
-echo -e "\nsource ~/repos/devops_101/vagrant/vagrant_vbox_env.sh\n" >> ~/.zshrc || \
-echo -e "\nsource ~/repos/devops_101/vagrant/vagrant_vbox_env.sh\n" >> ~/.bashrc
+echo -e "\nsource ~/devops_101/vagrant/vagrant_vbox_env.sh" >> ~/.zshrc || \
+echo -e "\nsource ~/devops_101/vagrant/vagrant_vbox_env.sh" >> ~/.bashrc
 ```
 
 Con todo preparado, podemos iniciar una nueva shell e instalar los plugins necesarios para este proyecto.
@@ -203,12 +219,41 @@ vagrant plugin install vagrant-vbguest
 
 #### 1.3 Implementación del `Vagrantfile`
 
-Nos vamos al repositorio
+Nos vamos al directorio `vagrant` de nuestro repositorio.
 
 ```bash
-
+cd ~/devops_101/vagrant
 ```
 
+Verificamos que [nuestro `Vagrantfile`](/vagrant/Vagrantfile) está correcto, iniciamos y verificamos la implantación.
+
+```bash
+vagrant validate
+vagrant up
+vagrant status
+```
+
+Podemos ejecutar comandos y conectarnos a la nueva VM.
+
+```bash
+vagrant ssh -c "sudo apt update && sudo apt install neofetch --no-install-recommends && neofetch"
+# vagrant ssh
+```
+
+Podemos detener/apagar la VM.
+
+```bash
+vagrant halt
+```
+
+Verificar las imágenes/*boxes*.
+
+```bash
+vagrant box list
+```
+
+
+#### 1.4 Ansible... 
 
 <!-- ### Proyecto 2. Terraform -->
 <!-- ### Proyecto 3. Kubernetes + CI/CD -->
