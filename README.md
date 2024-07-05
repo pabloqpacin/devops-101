@@ -7,11 +7,11 @@
   - [Objetivos](#objetivos)
   - [Proyectos](#proyectos)
     - [Proyecto 1. Vagrant + Ansible](#proyecto-1-vagrant--ansible)
-      - [1.1 Instalación de Vagrant y Ansible](#11-instalación-de-vagrant-y-ansible)
+      - [1.1 (Ch. 1) Instalación de Vagrant y Ansible](#11-ch-1-instalación-de-vagrant-y-ansible)
       - [1.2 Configuraciones: hardware, VirtualBox, Vagrant](#12-configuraciones-hardware-virtualbox-vagrant)
       - [1.3 Implementación del `Vagrantfile`](#13-implementación-del-vagrantfile)
       - [1.4 Ansible: `site.yml`](#14-ansible-siteyml)
-      - [1.5 Ansible: usuarios, grupos y contraseñas](#15-ansible-usuarios-grupos-y-contraseñas)
+      - [1.5 (Ch. 2) Ansible: usuarios, grupos y contraseñas](#15-ch-2-ansible-usuarios-grupos-y-contraseñas)
 
 
 ## Entornos de desarrollo y operaciones
@@ -129,7 +129,7 @@ sudo mount -a
 ```
 
 
-#### 1.1 Instalación de Vagrant y Ansible
+#### 1.1 (Ch. 1) Instalación de Vagrant y Ansible
 
 Instalamos **Vagrant** (Ubuntu/Debian).
 
@@ -317,7 +317,7 @@ Al levantar la VM con **Vagrant**, se ejecutará este *playbook* con éxito, si 
 
 > Decidimos que los archivos sean `.yml` y no `.yaml` por seguir el estilo de la documentación oficial (eg. [Ansible YAML file syntax and structure](https://developers.redhat.com/learning/learn:ansible:yaml-essentials-ansible/resource/resources:ansible-yaml-file-syntax-and-structure)), además de que es el estilo propuesto en el libro. Igualmente cambiamos la línea `become: yes` por `become: true`.
 
-#### 1.5 Ansible: usuarios, grupos y contraseñas
+#### 1.5 (Ch. 2) Ansible: usuarios, grupos y contraseñas
 
 <!-- ### Proyecto 2. Terraform -->
 <!-- ### Proyecto 3. Kubernetes + CI/CD -->
