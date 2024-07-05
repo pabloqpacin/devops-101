@@ -114,9 +114,9 @@ git clone https://github.com/pabloqpacin/devops_101.git $HOME/devops_101
 <!-- - [ ] [/vagrant](/vagrant/)
 - [ ] [/ansible](/ansible/) -->
 
-Nuestra máquina de operaciones es el *Acer EX2511* y nos conectaremos desde la de desarrollo *MSI GL76* mediante `ssh`. Ambas están en nuestra red local y pilotan el sistema operativo *Pop!_OS* (derivado de Ubuntu).
+Nos conectamos con `ssh` desde nuestra máquina de desarrollo *MSI GL76*  a la de operaciones *Acer EX2511*. Ambas están en nuestra red local y pilotan el sistema operativo *Pop!_OS* (derivado de Ubuntu).
 
-La máquina *EX2511* tiene el OS instalado en `/dev/sdb1` (esta sería la partición root o `/`). Previamente hemos creado la partición `/dev/sdb2` con idea de almacenar VMs. Aunque no es necesario, decidimos dar persistencia al montaje de particiones con los siguientes comandos.
+La máquina *EX2511* tiene el OS instalado en `/dev/sdb1` (esta sería la partición *root* o `/`). Previamente hemos creado la partición `/dev/sdb2` con idea de almacenar VMs. Aunque no es necesario, decidimos dar persistencia al montaje de particiones con los siguientes comandos.
 
 ```bash
 sudo mkdir -p /media/$USER/LAB

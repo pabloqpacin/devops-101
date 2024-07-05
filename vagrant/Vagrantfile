@@ -2,20 +2,24 @@ Vagrant.configure("2") do |config|
     config.vm.box = "ubuntu/jammy64"
     config.vm.hostname = "vagrant-ubuntu-2204"
 
-    # config.vm.provision "shell", inline: <<-SHELL
-    #     VBoxManage setproperty machinefolder /media/$USER/LAB/VBox
-    # SHELL
+    # Para el bridge indicar la adaptador de red del host real ($ ip -c a || ip link)
+    config.vm.network "public_network", bridge: "enp2s0"
+    
+    # config.vm.network "private_network", type: "dhcp",
+    #     name: "vboxnet3"
+    # config.vm.network "private_network", ip: "192.168.50.4",
+    #     virtualbox__intnet: "mynetwork"
 
-    # config.vm.network "private_network", type: "dhcp"
-    config.vm.network "public_network", bridge: "enp2s0"                            # Indicar la interfaz/adaptador de red de la máquina ($ ip -c a || ip link)
+    config.vbguest.auto_update = false
 
     config.vm.provider "virtualbox" do |vb|
         vb.name = "vagrant-ubuntu-2204"
         vb.memory = "2048"
         vb.cpus = 2
-        # vb.customize ["movevm", :id, "--folder", "/media/pabloqpacin/LAB/VBox"]   # Solo funciona la primera vez...
-        # vb.customize ["modifyvm", :id, "--uart1", "0x3F8", "4"]
-        # vb.customize ["modifyvm", :id, "--uartmode1", "file", File::NULL]
+
+        # vb.customize ["modifyvm", :id, "--nic1", "none"]
+        # vb.customize ["modifyvm", :id, "--nic2", "natnetwork", "--nat-network2", "mynatnetwork"]
+
     end
 
     config.vm.synced_folder ".", "vagrant", disabled: true
@@ -27,3 +31,10 @@ Vagrant.configure("2") do |config|
     end
 
 end
+
+
+# ---
+
+# https://developer.hashicorp.com/vagrant/docs/providers/virtualbox/networking#networking
+# https://www.virtualbox.org/manual/ch06.html#network-manager-nat-network-tab
+# https://www.virtualbox.org/manual/ch08.html#vboxmanage-modifyvm
