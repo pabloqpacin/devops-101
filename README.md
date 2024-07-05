@@ -114,9 +114,9 @@ git clone https://github.com/pabloqpacin/devops_101.git $HOME/devops_101
 <!-- - [ ] [/vagrant](/vagrant/)
 - [ ] [/ansible](/ansible/) -->
 
-Nuestra máquina de operaciones es la *Acer EX2511*, a la cual nos conectaremos desde la de desarrollo *MSI GL76* mediante `ssh`. Ambas están en nuestra red local y pilotan el sistema operativo *Pop!_OS* (derivado de Ubuntu).
+Nuestra máquina de operaciones es el *Acer EX2511* y nos conectaremos desde la de desarrollo *MSI GL76* mediante `ssh`. Ambas están en nuestra red local y pilotan el sistema operativo *Pop!_OS* (derivado de Ubuntu).
 
-La máquina *Acer EX2511* tiene el OS instalado en `/dev/sdb1` (es decir, la partición root o `/`). Previamente hemos creado la partición `/dev/sdb2` con idea de almacenar VMs. Aunque no es necesario, decidimos dar persistencia al montaje de particiones con los siguientes comandos.
+La máquina *EX2511* tiene el OS instalado en `/dev/sdb1` (esta sería la partición root o `/`). Previamente hemos creado la partición `/dev/sdb2` con idea de almacenar VMs. Aunque no es necesario, decidimos dar persistencia al montaje de particiones con los siguientes comandos.
 
 ```bash
 sudo mkdir -p /media/$USER/LAB
@@ -127,9 +127,6 @@ sudo mount -a
 # df -h | grep /media/$USER/LAB
 ```
 
-<!-- En este caso queremos almacenar las VMs en una partición aparte (`/dev/sdb2` con *label* `LAB`), que habrá que montar en la partición `/` (`/dev/sdb1`). El punto de montaje definido para este proyecto es `/media/$USER/LAB`. (Realizaremos la operación al arrancar la máquina mediante el comando `gio mount -d /dev/sdb2`). -->
-
-<!-- > El comando `gio mount -d /dev/sdb2` requiere iniciar sesión en la GUI de escritorio (eg. Gnome), por lo que para entornos remotos sin GUI habría que revisar este procedimiento de montaje. -->
 
 #### 1.1 Instalación de Vagrant y Ansible
 
@@ -179,8 +176,6 @@ Hemos preparado [el script `vagrant_vbox_env.sh`](/vagrant/vagrant_vbox_env.sh) 
 
 1. Asignar a la variable de entorno `$VAGRANT_HOME` el valor `/var/vagrant.d` (por defecto sería `~/.vagrant.d`). Aquí se almacenarán varios archivos de configuración de **Vagrant**. Cada imagen o *box* que descarguemos pesará medio GB así que puede llegar a pesar mucho y preferimos dejar este tipo de *bloat* fuera de `/home`.
 
-<!-- La primera es asignar a la variable de entorno que se asegura de que el hardware/almacenamiento de las VMs de VirtualBox está montado y de que la variable `$VAGRANT_HOME` tiene el valor `/var/vagrant.d` (donde se almacenarán los archivos de configuración de **Vagrant**). -->
-
 <!-- Primero descargamos el script y lo guardamos como `~/vagrant_vbox_env.sh`. Si hemos clonado el repositorio también podríamos copiarlo o hacer un symlink en local.
 
 ```bash
@@ -188,9 +183,7 @@ curl -so ~/vagrant_vbox_env.sh \
     https://raw.githubusercontent.com/pabloqpacin/devops-101/main/vagrant/vagrant_vbox_env_sh
 ``` -->
 
-<!-- Si la configuración de hardware/particiones es distinta o simplemente queremos cambiar el directorio por defecto donde **VirtualBox** almacenará las VMs, habrá que modificar este comando del script y verificar que se montan tales particiones/directorios. -->
-
-2. Queremos almacenar las VMs en la partición `/dev/sdb2` montada como `/media/$USER/LAB` de forma persistente. Igualmente verificamos que la partición está montada y si no es así se intenta mediante con el comando `gio mount -d /dev/sdb2`. Desafortunadamente este comando requiere iniciar la sesión gráfica de escritorio tipo Gnome, Cosmic...
+2. Queremos almacenar las VMs en la **partición** `/dev/sdb2` montada como `/media/$USER/LAB` de forma persistente. Igualmente verificamos que la partición está montada y si no es así se intenta mediante con el comando `gio mount -d /dev/sdb2`. Desafortunadamente este comando requiere iniciar la sesión gráfica de escritorio tipo Gnome, Cosmic..., por eso la persistencia.
 
 3. Finalmente, revisamos y definimos el directorio donde **VirtualBox** almacenará por defecto las VMs. 
 
@@ -214,6 +207,7 @@ Con todo preparado, podemos iniciar una nueva shell e instalar los plugins neces
 vagrant plugin update
 vagrant plugin install vagrant-vbguest
 # vagrant plugin install vagrant-share vagrant-disksize
+vagrant plugin list
 ```
 
 
@@ -225,32 +219,61 @@ Nos vamos al directorio `vagrant` de nuestro repositorio.
 cd ~/devops_101/vagrant
 ```
 
-Verificamos que [nuestro `Vagrantfile`](/vagrant/Vagrantfile) está correcto, iniciamos y verificamos la implantación.
+Repasamos [nuestro `Vagrantfile`](/vagrant/Vagrantfile).
+
+```Vagrantfile
+Vagrant.configure("2") do |config|
+    config.vm.box = "ubuntu/jammy64"
+    config.vm.hostname = "vag-ubu2204"
+
+    config.vm.network "public_network", bridge: "enp2s0"
+
+    config.vm.provider "virtualbox" do |vb|
+        vb.name = "vag-ubu2204"
+        vb.memory = "2048"
+        vb.cpus = 2
+    end
+
+    config.vm.synced_folder ".", "vagrant", disabled: true
+
+    config.vm.provision "ansible" do |ansible|
+        ansible.playbook = "../ansible/site.yml"
+        ansible.compatibility_mode = "2.0"
+    end
+
+end
+```
+
+<!-- - [ ] ¿Guardar VM en grupo de VBox? -->
+<!-- - [ ] `config.disksize.size = '50GB'` -->
+<!-- - [ ] ¿Desactivar primera interfaz NAT? -->
+<!-- - [ ] Asignar interfaz a red NAT -->
+
+Verificamos que el `Vagrantfile` está correcto, iniciamos y verificamos la implantación.
+
+> **NOTA**: el comando `vagrant` solo tiene en cuenta las VMs asociadas al `Vagrantfile` del directorio actual en la shell (`pwd`).
+
 
 ```bash
+# vagrant list-commands
 vagrant validate
 vagrant up
 vagrant status
 ```
 
-Podemos ejecutar comandos y conectarnos a la nueva VM.
+Podemos ejecutar comandos en la VM y conectarnos a la nueva VM. Podemos detener/apagar la VM, y eliminarla. También podemos verificar las imágenes/*boxes*.
 
 ```bash
 vagrant ssh -c "sudo apt update && sudo apt install neofetch --no-install-recommends && neofetch"
 # vagrant ssh
-```
 
-Podemos detener/apagar la VM.
-
-```bash
 vagrant halt
-```
+# vagrant destroy
 
-Verificar las imágenes/*boxes*.
-
-```bash
 vagrant box list
 ```
+
+> **NOTA**: si abrimos la GUI de VirtualBox podremos ver las nuevas VMs y es posible conectarse a ellas. Para el login, el usuario y la contraseña son `vagrant`.
 
 
 #### 1.4 Ansible... 
