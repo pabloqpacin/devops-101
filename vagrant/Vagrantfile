@@ -1,0 +1,40 @@
+Vagrant.configure("2") do |config|
+    config.vm.box = "ubuntu/jammy64"
+    config.vm.hostname = "vagrant-ubuntu-2204"
+
+    # Para el bridge indicar la adaptador de red del host real ($ ip -c a || ip link)
+    config.vm.network "public_network", bridge: "enp2s0"
+    
+    # config.vm.network "private_network", type: "dhcp",
+    #     name: "vboxnet3"
+    # config.vm.network "private_network", ip: "192.168.50.4",
+    #     virtualbox__intnet: "mynetwork"
+
+    config.vbguest.auto_update = false
+
+    config.vm.provider "virtualbox" do |vb|
+        vb.name = "vagrant-ubuntu-2204"
+        vb.memory = "2048"
+        vb.cpus = 2
+
+        # vb.customize ["modifyvm", :id, "--nic1", "none"]
+        # vb.customize ["modifyvm", :id, "--nic2", "natnetwork", "--nat-network2", "mynatnetwork"]
+
+    end
+
+    config.vm.synced_folder ".", "vagrant", disabled: true
+    # config.vm.synced_folder '/host/path', '/guest/path', SharedFoldersEnableSymlinksCreate: false
+
+    config.vm.provision "ansible" do |ansible|
+        ansible.playbook = "../ansible/site.yml"
+        ansible.compatibility_mode = "2.0"
+    end
+
+end
+
+
+# ---
+
+# https://developer.hashicorp.com/vagrant/docs/providers/virtualbox/networking#networking
+# https://www.virtualbox.org/manual/ch06.html#network-manager-nat-network-tab
+# https://www.virtualbox.org/manual/ch08.html#vboxmanage-modifyvm
