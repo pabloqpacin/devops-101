@@ -1,4 +1,5 @@
 # devops_101
+# devops_101
 
 > ***DevOps for the Desperate**. A Hands-On Survival Guide*. [Libro](https://nostarch.com/devops-desperate), [repo](https://github.com/bradleyd/devops_for_the_desperate).
 
@@ -7,10 +8,11 @@
   - [Objetivos](#objetivos)
   - [Proyectos](#proyectos)
     - [Proyecto 1. Vagrant + Ansible](#proyecto-1-vagrant--ansible)
-      - [1.1 Instalación de Vagrant y Ansible](#11-instalación-de-vagrant-y-ansible)
+      - [1.1 (Ch. 1) Instalación de Vagrant y Ansible](#11-ch-1-instalación-de-vagrant-y-ansible)
       - [1.2 Configuraciones: hardware, VirtualBox, Vagrant](#12-configuraciones-hardware-virtualbox-vagrant)
       - [1.3 Implementación del `Vagrantfile`](#13-implementación-del-vagrantfile)
-      - [1.4 Ansible...](#14-ansible)
+      - [1.4 Ansible: `site.yml`](#14-ansible-siteyml)
+      - [1.5 (Ch. 2) Ansible: usuarios, grupos y contraseñas](#15-ch-2-ansible-usuarios-grupos-y-contraseñas)
 
 
 ## Entornos de desarrollo y operaciones
@@ -128,7 +130,7 @@ sudo mount -a
 ```
 
 
-#### 1.1 Instalación de Vagrant y Ansible
+#### 1.1 (Ch. 1) Instalación de Vagrant y Ansible
 
 Instalamos **Vagrant** (Ubuntu/Debian).
 
@@ -224,12 +226,14 @@ Repasamos [nuestro `Vagrantfile`](/vagrant/Vagrantfile).
 ```Vagrantfile
 Vagrant.configure("2") do |config|
     config.vm.box = "ubuntu/jammy64"
-    config.vm.hostname = "vag-ubu2204"
+    config.vm.hostname = "vagrant-ubuntu-2204"
 
     config.vm.network "public_network", bridge: "enp2s0"
 
+    config.vbguest.auto_update = false
+
     config.vm.provider "virtualbox" do |vb|
-        vb.name = "vag-ubu2204"
+        vb.name = "vagrant-ubuntu-2204"
         vb.memory = "2048"
         vb.cpus = 2
     end
@@ -276,7 +280,45 @@ vagrant box list
 > **NOTA**: si abrimos la GUI de VirtualBox podremos ver las nuevas VMs y es posible conectarse a ellas. Para el login, el usuario y la contraseña son `vagrant`.
 
 
-#### 1.4 Ansible... 
+#### 1.4 Ansible: `site.yml`
+
+Con **Ansible** ya instalado, nos aseguramos de que nuestro `Vagrantfile` contiene estas líneas:
+
+```Vagrantfile
+config.vm.provision "ansible" do |ansible|
+    ansible.playbook = "../ansible/site.yml"
+    ansible.compatibility_mode = "2.0"
+end
+```
+
+Este código cargará nuestro *playbook* (archivo de configuración) de Ansible principal para este proyecto. Será necesario ir modificando este archivo `site.yml` para implementar cosas. El resto de esta documentación/proyecto tratará en detalle el resto de archivos `.yml` y las operaciones con Ansible.
+
+Este sería nuestro `site.yml` actualmente.
+
+```yaml
+---
+- name: Provision VM
+  hosts: all
+  become: true
+  become_method: sudo
+  remote_user: ubuntu
+  tasks:
+    #  - import_tasks: chapter2/pam_pwquality.yml
+    #  - import_tasks: chapter2/user_and_group.yml
+    #  - import_tasks: chapter3/authorized_keys.yml
+    #  - import_tasks: chapter3/two_factor.yml
+    #  - import_tasks: chapter4/web_application.yml
+    #  - import_tasks: chapter4/sudoers.yml
+    #  - import_tasks: chapter5/firewall.yml
+  handlers:
+    #  - import_tasks: handlers/restart_ssh.yml
+```
+
+Al levantar la VM con **Vagrant**, se ejecutará este *playbook* con éxito, si bien al no tener tareas específicas (los *playbooks* que las llevarán a cabo están comentados) no se hará ningún *provisioning* en la VM.
+
+> Decidimos que los archivos sean `.yml` y no `.yaml` por seguir el estilo de la documentación oficial (eg. [Ansible YAML file syntax and structure](https://developers.redhat.com/learning/learn:ansible:yaml-essentials-ansible/resource/resources:ansible-yaml-file-syntax-and-structure)), además de que es el estilo propuesto en el libro. Igualmente cambiamos la línea `become: yes` por `become: true`.
+
+#### 1.5 (Ch. 2) Ansible: usuarios, grupos y contraseñas
 
 <!-- ### Proyecto 2. Terraform -->
 <!-- ### Proyecto 3. Kubernetes + CI/CD -->
