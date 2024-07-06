@@ -176,7 +176,7 @@ sudo apt install -y ansible
 
 #### 1.2 Configuraciones: hardware, VirtualBox, Vagrant
 
-Hemos preparado [el script `vagrant_vbox_env.sh`](/vagrant/vagrant_vbox_env.sh) para realizar varias tareas importantes.
+Hemos preparado [el script `vagrant_vbox_env.sh`](/scripts/vagrant_vbox_env.sh) para realizar varias tareas importantes.
 
 1. Asignar a la variable de entorno `$VAGRANT_HOME` el valor `/var/vagrant.d` (por defecto sería `~/.vagrant.d`). Aquí se almacenarán varios archivos de configuración de **Vagrant**. Cada imagen o *box* que descarguemos pesará medio GB así que puede llegar a pesar mucho y preferimos dejar este tipo de *bloat* fuera de `/home`.
 
@@ -199,8 +199,8 @@ VBoxManage setproperty machinefolder /media/$USER/LAB/VBox
 Hacemos que la shell (*zsh* o *bash*) ejecute nuestro script verificador al iniciarse.
 
 ```bash
-echo -e "\nsource ~/devops_101/vagrant/vagrant_vbox_env.sh" >> ~/.zshrc || \
-echo -e "\nsource ~/devops_101/vagrant/vagrant_vbox_env.sh" >> ~/.bashrc
+echo -e "\nsource ~/devops_101/scripts/vagrant_vbox_env.sh" >> ~/.zshrc || \
+echo -e "\nsource ~/devops_101/scripts/vagrant_vbox_env.sh" >> ~/.bashrc
 ```
 
 Con todo preparado, podemos iniciar una nueva shell e instalar los plugins necesarios para este proyecto.
