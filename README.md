@@ -508,7 +508,103 @@ Ahora podemos editar nuestro `site.yml` para incluir el archivo `ansible/chapter
 
 ##### `two_factor.yml` y `google_authenticator`
 
+<!--
+For this example, you’ll use a *time-based one-time password (TOTP)* to
+satisfy the “something you have” portion, along with your public key for
+access. You’ll use the `Google Authenticator` package to configure your VM to
+use TOTP tokens for logging in. These TOTP tokens are usually generated
+from an application like `oathtool` (*https://www.nongnu.org/oath-toolkit/*) and
+are valid for only a short period of time. I have taken the liberty of creating
+10 TOTP tokens that Ansible will use for you, but I will also show you how
+to use oathtool (more on this later).
+-->
 
+El según factor de autenticación va a ser **TOTP** (*Time-based one-time password*) mediante `GoogleAuthenticator`. Lo ideal sería, teniendo preparada la app de Android **Google Authenticator**, acceder a la VM tras instalar el paquete `libpam-google-authenticate` (1ª tarea a continuación), ejecutarlo de la siguiente forma, escanear el QR con el móvil e introducir en la terminal el código que salga en la app.
+
+```bash
+google-authenticator -f -t -d -r 3 -R 30 -w 17 -e 10
+    # Warning: pasting the following URL into your browser exposes the OTP secret to Google:
+    #   https://www.google.com/chart?chs=200x200&chld=M|0&cht=qr&chl=otpauth://totp/vagrant@vagrant-ubuntu-2204%3Fsecret%3DX5AH<...>JT7Q%26issuer%3Dvagrant-ubuntu-2204
+    # <QR>
+    # Your new secret key is: X5AH<...>JT7Q
+    # Enter code from app (-1 to skip): 972935
+
+    # Code confirmed
+    # Your emergency scratch codes are:
+    #   11880927
+    #   35111193
+    #   32810950
+    #   87502136
+    #   81456931
+    #   79721071
+    #   31977925
+    #   28440037
+    #   12366122
+    #   65260038
+```
+
+Al completarse el proceso, se crea el archivo `~/.google_authenticator`. En este caso en lugar de generar todo esto, vamos a copiar un archivo proporcionado por el autor del **libro** (2ª tarea).
+
+> **IMPORTANTE**: de nuevo, no hay seguridad si se los tokens y llaves secretas se publican en internet, por lo que lo suyo sería usar ***Ansible Vault***, [*HashiCorp's Vault*](https://www.vaultproject.io/) o algo similar.
+
+
+
+
+En definitiva, el archivo `.yml` de este apartado cumplirá los siguientes objetivos:
+1. Instalar `libpam-google-authenticate`
+2. Copiar un archivo de configuración de `GoogleAuthenticator` <!--OJO-->
+3. Desactivar el login por contraseña para **ssh**
+4. Configurar PAM para usar `GoogleAuthenticator` para el login por **ssh**
+5. Activar `ChallengeResponseAuthentication`
+6. Configurar Método de Autenticación para *bender*, *vagrant* y *ubuntu*
+7. Insertar línea adicional "Restart SSH Server"
+
+
+```yaml
+- name: Install the libpam-google-authenticator package
+  apt:
+    name: "libpam-google-authenticator"
+    update_cache: yes
+    state: present
+
+- name: Copy over Preconfigured GoogleAuthenticator config
+  copy:
+    src: ../ansible/chapter3/google_authenticator
+    dest: /home/bender/.google_authenticator
+    owner: bender
+    group: bender
+    mode: '0600'
+  no_log: true
+
+# - name: Disable password authentication for SSH
+#   lineinfile:
+#     dest: "/etc/pam.d/sshd"
+#     regex: "@include common-auth"
+#     line: "#@include common-auth"
+
+# - name: Configure PAM to use GoogleAuthenticator for SSH logins
+#   lineinfile:
+#     dest: "/etc/pam.d/sshd"
+#     line: "auth required pam_google_authenticator.so nullok"
+
+# - name: Set ChallengeResponseAuthentication to Yes
+#   lineinfile:
+#     dest: "/etc/ssh/sshd_config"
+#     regexp: "^ChallengeResponseAuthentication (yes|no)"
+#     line: "ChallengeResponseAuthentication yes"
+#     state: present
+
+# - name: Set Authentication Methods for bender, vagrant, and ubuntu
+#   blockinfile:
+#     path: "/etc/ssh/sshd_config"
+#     block: |
+#       Match User "ubuntu,vagrant"
+#           AuthenticationMethods publickey
+#       Match User "bender,!vagrant,!ubuntu"
+#           AuthenticationMethods publickey,keyboard-interactive
+#     state: present
+#   notify: "Restart SSH Server"
+```
 
 
 <!-- ### Proyecto 2. Terraform -->
