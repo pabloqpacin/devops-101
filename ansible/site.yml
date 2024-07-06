@@ -5,7 +5,7 @@
   become_method: sudo
   remote_user: ubuntu
   tasks:
-    #  - import_tasks: chapter2/pam_pwquality.yml
+    - import_tasks: chapter2/pam_pwquality.yml
     #  - import_tasks: chapter2/user_and_group.yml
     #  - import_tasks: chapter3/authorized_keys.yml
     #  - import_tasks: chapter3/two_factor.yml

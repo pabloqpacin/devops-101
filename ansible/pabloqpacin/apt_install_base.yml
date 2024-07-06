@@ -1,0 +1,15 @@
+---
+- name: Install git
+  package:
+    name: "git"
+    state: present
+
+- name: Install zsh
+  package:
+    name: "zsh"
+    state: present
+
+
+# ---
+
+# https://docs.ansible.com/ansible/latest/collections/ansible/builtin/apt_repository_module.html
