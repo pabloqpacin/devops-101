@@ -12,6 +12,9 @@
       - [1.3 Implementación del `Vagrantfile`](#13-implementación-del-vagrantfile)
       - [1.4 Ansible: `site.yml`](#14-ansible-siteyml)
       - [1.5 (Ch. 2) Ansible: usuarios, grupos y contraseñas](#15-ch-2-ansible-usuarios-grupos-y-contraseñas)
+        - [`pam_pwquality.yml`](#pam_pwqualityyml)
+        - [`user_and_group.yml`](#user_and_groupyml)
+        - [Demo: usuarios y permisos](#demo-usuarios-y-permisos)
 
 
 ## Entornos de desarrollo y operaciones
@@ -261,6 +264,7 @@ Verificamos que el `Vagrantfile` está correcto, iniciamos y verificamos la impl
 # vagrant list-commands
 vagrant validate
 vagrant up
+# vagrant up --debug
 vagrant status
 ```
 
@@ -317,7 +321,164 @@ Al levantar la VM con **Vagrant**, se ejecutará este *playbook* con éxito, si 
 
 > Decidimos que los archivos sean `.yml` y no `.yaml` por seguir el estilo de la documentación oficial (eg. [Ansible YAML file syntax and structure](https://developers.redhat.com/learning/learn:ansible:yaml-essentials-ansible/resource/resources:ansible-yaml-file-syntax-and-structure)), además de que es el estilo propuesto en el libro. Igualmente cambiamos la línea `become: yes` por `become: true`.
 
+
 #### 1.5 (Ch. 2) Ansible: usuarios, grupos y contraseñas
+
+Iremos creando los archivos `.yml` con las tareas en el directorio `ansible/chapter2/`. Para operar con ellos habrá que descomentar las líneas relevantes en `ansible/site.yml`.
+
+Si la VM ya existe (ya hicimos `vagrant up`) usaremos este comando para aplicar **Ansible** <!--según se define en nuestro `Vagrantfile`-->.
+
+```bash
+# vagrant up
+vagrant provision
+# vagrant provision --debug
+```
+
+
+##### `pam_pwquality.yml`
+
+En esta primera tarea se instala el paquete `libpam-pwquality` y se edita el archivo de configuración `/etc/pam.d/common-password` para imponer las siguientes restricciones en la creación de contraseñas:
+
+- Un mínimo de 12 caracteres
+- Una letra minúscula
+- Una letra mayúscula
+- Un caracter numérico
+- Un caracter no alfanumérico
+- Tres intentos
+- Desactivar invalidación de root
+
+```yaml
+---
+- name: Install libpam-pwquality
+  package:
+    name: "libpam-pwquality"
+    state: present
+
+- name: Configure pam_pwquality
+  lineinfile:
+    path: "/etc/pam.d/common-password"
+    regexp: "pam_pwquality.so"
+    line: "password required pam_pwquality.so minlen=12 lcredit=-1 ucredit=-1 dcredit=-1 ocredit=-1 retry=3 enforce_for_root"
+    state: present
+
+    #- name: Limit Password Reuse
+    #  lineinfile:
+    #    dest: "/etc/pam.d/common-password"
+    #    regexp: "remember=5"
+    #    line: "password sufficient pam_unix.so use_authtok remember=5"
+    #    state: present
+```
+
+<!-- - [ ] ¿Cómo se instala? Supongo que `apt install foo` pero bueno, en otros casos podría ser `snap install bar`... -->
+
+##### `user_and_group.yml`
+
+> **IMPORTANTE**: es insecuro tener contraseñas o llaves en un repo público. Implementar [**Ansible Vault**](https://docs.ansible.com/ansible/latest/vault_guide/index.html)... <!--https://docs.ansible.com/ansible/2.9/user_guide/vault.html-->
+
+
+En nuestra máquina (no la VM) vamos a necesitar los programas `pwgen` para generar contraseñas seguras y `mkpasswd` para generar los *hashes* de estas contraseñas. Escribiremos el *hash* en el siguiente archivo `.yml`. <!--Aunque la contraseña no nos hace falta, podemos guardarla en nuestro **gestor de contraseñas** favorito, KeePassXC.-->
+
+```bash
+sudo apt update
+sudo apt install pwgen whois
+
+pass=$(pwgen --secure --capitalize --numerals --symbols 12 1)
+
+echo $pass | mkpasswd --stdin --method=sha-512; echo $pass
+    # $6$QJmzvbMhlt7C.qOO$uSkIZs/nINf2HFR/.nerO3qfRzIOR53BwZVwJspkkKdrO1KLOzIcW7hG7UWAhGTh/VJVvxhbZO7qloGqGs30E/
+    # ]aR8WG{/yqG}
+```
+
+
+Este es el archivo, y con estas tareas conseguimos lo siguiente:
+
+- crear el grupo *developers*
+- crear el usuario *bender*
+- añadir a *bender* al grupo *developers*
+- crear el directorio `/opt/engineering`
+- crear un archivo en el nuevo directorio
+
+```yaml
+- name: Ensure group 'developers' exists
+  group:
+    name: developers
+    state: present
+
+- name: Create the user 'bender'
+  user:
+    name: bender
+    shell: /bin/bash
+    password: $6$QJmzvbMhlt7C.qOO$uSkIZs/nINf2HFR/.nerO3qfRzIOR53BwZVwJspkkKdrO1KLOzIcW7hG7UWAhGTh/VJVvxhbZO7qloGqGs30E/
+
+- name: Assign 'bender' to the 'developers' group
+  user:
+    name: bender
+    groups: developers
+    append: yes
+
+- name: Create a directory named 'engineering'
+  file:
+    path: /opt/engineering
+    state: directory
+    mode: 0750
+    group: developers
+
+- name: Create a file in the engineering directory
+  file:
+    path: "/opt/engineering/private.txt"
+    state: touch
+    mode: 0770
+    group: developers
+```
+
+<!-- - [ ] en principio solo local, ¿y en carpeta compartida (tema Vagrant)? -->
+
+Este es un buen momento para editar el `site.yml` y ejecutar `vagrant provision`.
+
+##### Demo: usuarios y permisos
+
+Nos logueamos en la VM. Nuestro usuario debería ser `vagrant`.
+
+```bash
+cd ~/devops_101/vagrant
+# vagrant ssh -c "whoami"
+vagrant ssh
+```
+
+Verificamos que existen el usuario *bender* y el grupo *developers*.
+
+```bash
+getent passwd bender
+    # bender:x:1002:1003::/home/bender:/bin/bash
+
+getent group developers bender
+    # developers:x:1002:bender
+    # bender:x:1003:
+```
+
+Para el archivo, primero comprobamos que *vagrant* no tiene acceso, luego nos logueamos como *bender* y comprobamos que tenemos acceso.
+
+```bash
+ls -la /opt/engineering/
+    # ls: cannot open directory '/opt/engineering/': Permission denied
+
+# su bender
+    # ]aR8WG{/yqG}
+
+sudo su - bender
+
+# groups
+    # bender developers
+
+ls -la /opt/engineering/
+    # drwxr-x--- 2 root developers 4096 Jul  6 14:54 .
+    # drwxr-xr-x 3 root root       4096 Jul  6 14:54 ..
+    # -rwxrwx--- 1 root developers    4 Jul  6 15:07 private.txt
+```
+
+
+
+
 
 <!-- ### Proyecto 2. Terraform -->
 <!-- ### Proyecto 3. Kubernetes + CI/CD -->
