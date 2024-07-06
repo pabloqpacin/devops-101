@@ -1,0 +1,35 @@
+---
+
+# los dotfiles deberían ser para el usuario vagrant o pabloqpacin, no root...
+
+- name: Search for '~/dotfiles'
+  ansible.builtin.stat:
+    path: ~/dotfiles
+  register: dotfiles
+
+- name: Clone 'dotfiles'
+  command: git clone https://github.com/pabloqpacin/dotfiles ~/dotfiles
+  when: not dotfiles.stat.exists
+
+
+# - name: Search for ~/.ohmyzsh
+#   register: ohmyzsh
+#   ansible.builtin.stat:
+#     path: ~/.ohmyzsh
+
+# - name: Install oh-my-zsh
+#   command: sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+#   when: not ohmyzsh.stat.exists
+
+
+# - name: Symlink 'bat' if installed
+#   ansible.builtin.stat:
+#     path: ~/dotfiles
+#   register: dotfiles
+
+
+
+# ---
+
+# https://docs.ansible.com/ansible/latest/collections/ansible/builtin/stat_module.html
+# https://github.com/viasite-ansible/ansible-role-zsh

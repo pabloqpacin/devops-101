@@ -373,10 +373,10 @@ En esta primera tarea se instala el paquete `libpam-pwquality` y se edita el arc
 
 ##### `user_and_group.yml`
 
-> **IMPORTANTE**: es insecuro tener contraseñas o llaves en un repo público. Deberíamos usar [**Ansible Vault**](https://docs.ansible.com/ansible/latest/vault_guide/index.html)... <!--https://docs.ansible.com/ansible/2.9/user_guide/vault.html-->
+> **IMPORTANTE**: es insecuro tener contraseñas o llaves en un repo público. Implementar [**Ansible Vault**](https://docs.ansible.com/ansible/latest/vault_guide/index.html)... <!--https://docs.ansible.com/ansible/2.9/user_guide/vault.html-->
 
 
-En nuestra máquina real (no la VM) vamos a necesitar los programas `pwgen` para generar contraseñas seguras y `mkpasswd` para generar los *hashes* de estas contraseñas. Escribiremos el *hash* en el siguiente archivo `.yml`. <!--Aunque la contraseña no nos hace falta, podemos guardarla en nuestro **gestor de contraseñas** favorito, KeePassXC.-->
+En nuestra máquina (no la VM) vamos a necesitar los programas `pwgen` para generar contraseñas seguras y `mkpasswd` para generar los *hashes* de estas contraseñas. Escribiremos el *hash* en el siguiente archivo `.yml`. <!--Aunque la contraseña no nos hace falta, podemos guardarla en nuestro **gestor de contraseñas** favorito, KeePassXC.-->
 
 ```bash
 sudo apt update
@@ -433,7 +433,7 @@ Este es el archivo, y con estas tareas conseguimos lo siguiente:
 
 <!-- - [ ] en principio solo local, ¿y en carpeta compartida (tema Vagrant)? -->
 
-Este es un buen momento para editar el `site.yml` y ejecutar `vagrant provision`
+Este es un buen momento para editar el `site.yml` y ejecutar `vagrant provision`.
 
 ##### Demo: usuarios y permisos
 
@@ -463,9 +463,12 @@ ls -la /opt/engineering/
     # ls: cannot open directory '/opt/engineering/': Permission denied
 
 # su bender
-#     # ]aR8WG{/yqG}
+    # ]aR8WG{/yqG}
 
 sudo su - bender
+
+# groups
+    # bender developers
 
 ls -la /opt/engineering/
     # drwxr-x--- 2 root developers 4096 Jul  6 14:54 .
