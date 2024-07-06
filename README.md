@@ -15,6 +15,9 @@
         - [`pam_pwquality.yml`](#pam_pwqualityyml)
         - [`user_and_group.yml`](#user_and_groupyml)
         - [Demo: usuarios y permisos](#demo-usuarios-y-permisos)
+      - [1.6 (Ch. 3) Ansible: ssh and 2FA](#16-ch-3-ansible-ssh-and-2fa)
+        - [Generar claves ssh y `authorized_keys.yml`](#generar-claves-ssh-y-authorized_keysyml)
+        - [`two_factor.yml` y `google_authenticator`](#two_factoryml-y-google_authenticator)
 
 
 ## Entornos de desarrollo y operaciones
@@ -476,6 +479,34 @@ ls -la /opt/engineering/
     # -rwxrwx--- 1 root developers    4 Jul  6 15:07 private.txt
 ```
 
+#### 1.6 (Ch. 3) Ansible: ssh and 2FA
+
+Para el usuario *bender* de nuestra VM. Desactivaremos el acceso por ssh con contraseña y habilitaremos 2FA con **llaves ssh** y *google authenticator*.
+
+##### Generar claves ssh y `authorized_keys.yml`
+
+En nuestra máquina de operaciones generamos nuevas claves **ssh** (privada y pública). El siguiente comando nos pedirá una *passphrase*, que debemos guardar en un gestor de contraseñas o similar.
+
+```bash
+ssh-keygen -t rsa -f ~/.ssh/dftd -C dftd
+
+# read -p "Passphrase para las llaves 'dftd': " passphrase
+# ssh-keygen -t rsa -f ~/.ssh/dftd -C dftd -N "$passphrase"
+```
+
+Ahora podemos editar nuestro `site.yml` para incluir el archivo `ansible/chapter3/authorized_keys.yml`.
+
+```yaml
+---
+- name: Set authorized key file from local user
+  authorized_key:
+    user: bender 
+    state: present
+    key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/dftd.pub') }}"
+```
+
+
+##### `two_factor.yml` y `google_authenticator`
 
 
 
