@@ -1,0 +1,16 @@
+---
+- name: pabloqpacin VMs
+  hosts: all
+  become: true
+  become_method: sudo
+  remote_user: ubuntu
+  tasks:
+     - import_tasks: custom/baseos/apt_update.yml
+     - import_tasks: custom/baseos/install_misc.yml
+  #  - import_tasks: custom/baseos/install_bat.yml
+    #  - import_tasks: custom/baseos/user_and_group.yml
+    #  - import_tasks: custom/dotfiles/clone_dotfiles.yml
+    #  - import_tasks: custom/dotfiles/zsh.yml
+    #  - import_tasks: custom/dotfiles/bat.yml
+  handlers:
+    # - import_tasks: handlers/rename_batcat.yml

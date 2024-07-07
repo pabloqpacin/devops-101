@@ -1,0 +1,26 @@
+---
+- name: Install curl
+  package:
+    name: "curl"
+    state: present
+
+- name: Install git
+  package:
+    name: "git"
+    state: present
+
+- name: Install zsh
+  package:
+    name: "zsh"
+    state: present
+
+- name: Install bat
+  package:
+    name: "bat"
+    state: present
+  # notify: "Check batcat existence and handle"
+
+
+# ---
+
+# https://docs.ansible.com/ansible/latest/collections/ansible/builtin/apt_repository_module.html

@@ -1,0 +1,30 @@
+- name: Ensure group 'devops' exists
+  group:
+    name: devops
+    state: present
+
+- name: Create the user 'pabloqpacin'
+  user:
+    name: pabloqpacin
+    shell: /usr/bin/zsh
+    password: $6$OStSJfA6FA$ffSDaJBWfSpmnwlC6QWJwLG3PgZWQhPYUSezmRvSiUFpwSWy/57KuUuLg/4yGBpKx2TWYsPDz9Yq7nL2I2XT3/
+
+- name: Assign 'pabloqpacin' to the 'devops' group
+  user:
+    name: pabloqpacin
+    groups: devops
+    append: yes
+
+- name: Create a directory named 'setelabs'
+  file:
+    path: /opt/setelabs
+    state: directory
+    mode: 0750
+    group: devops
+
+- name: Create a file in the 'setelabs' directory
+  file:
+    path: "/opt/setelabs/private.txt"
+    state: touch
+    mode: 0770
+    group: devops
