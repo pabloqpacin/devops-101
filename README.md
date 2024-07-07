@@ -519,7 +519,7 @@ are valid for only a short period of time. I have taken the liberty of creating
 to use oathtool (more on this later).
 -->
 
-El según factor de autenticación va a ser **TOTP** (*Time-based one-time password*) mediante `GoogleAuthenticator`. Lo ideal sería, teniendo preparada la app de Android **Google Authenticator**, acceder a la VM tras instalar el paquete `libpam-google-authenticate` (1ª tarea a continuación), ejecutarlo de la siguiente forma, escanear el QR con el móvil e introducir en la terminal el código que salga en la app.
+El según factor de autenticación va a ser **TOTP** (*Time-based one-time password*) mediante `GoogleAuthenticator`. Lo ideal sería, teniendo preparada la app de Android **Google Authenticator**, acceder como *bender* a la VM tras instalar el paquete `libpam-google-authenticate` (1ª tarea a continuación), ejecutarlo de la siguiente forma, escanear el QR con el móvil e introducir en la terminal el código que salga en la app.
 
 ```bash
 google-authenticator -f -t -d -r 3 -R 30 -w 17 -e 10
@@ -545,7 +545,7 @@ google-authenticator -f -t -d -r 3 -R 30 -w 17 -e 10
 
 Al completarse el proceso, se crea el archivo `~/.google_authenticator`. En este caso en lugar de generar todo esto, vamos a copiar un archivo proporcionado por el autor del **libro** (2ª tarea).
 
-> **IMPORTANTE**: de nuevo, no hay seguridad si se los tokens y llaves secretas se publican en internet, por lo que lo suyo sería usar ***Ansible Vault***, [*HashiCorp's Vault*](https://www.vaultproject.io/) o algo similar.
+> **IMPORTANTE**: de nuevo, no hay seguridad si publicamos en internet los tokens y las llaves secretas; lo suyo sería usar ***Ansible Vault***, [*HashiCorp's Vault*](https://www.vaultproject.io/) o algo similar.
 
 
 
@@ -553,8 +553,8 @@ Al completarse el proceso, se crea el archivo `~/.google_authenticator`. En este
 En definitiva, el archivo `.yml` de este apartado cumplirá los siguientes objetivos:
 1. Instalar `libpam-google-authenticate`
 2. Copiar un archivo de configuración de `GoogleAuthenticator` <!--OJO-->
-3. Desactivar el login por contraseña para **ssh**
-4. Configurar PAM para usar `GoogleAuthenticator` para el login por **ssh**
+3. Desactivar el login por contraseña para **ssh** (mediante *PAM*)
+4. Configurar *PAM* para usar `GoogleAuthenticator` para el login por **ssh**
 5. Activar `ChallengeResponseAuthentication`
 6. Configurar Método de Autenticación para *bender*, *vagrant* y *ubuntu*
 7. Insertar línea adicional "Restart SSH Server"
@@ -576,16 +576,19 @@ En definitiva, el archivo `.yml` de este apartado cumplirá los siguientes objet
     mode: '0600'
   no_log: true
 
-# - name: Disable password authentication for SSH
-#   lineinfile:
-#     dest: "/etc/pam.d/sshd"
-#     regex: "@include common-auth"
-#     line: "#@include common-auth"
+- name: Disable password authentication for SSH
+  lineinfile:
+    dest: "/etc/pam.d/sshd"
+    regex: "@include common-auth"
+    line: "#@include common-auth"
 
-# - name: Configure PAM to use GoogleAuthenticator for SSH logins
-#   lineinfile:
-#     dest: "/etc/pam.d/sshd"
-#     line: "auth required pam_google_authenticator.so nullok"
+- name: Configure PAM to use GoogleAuthenticator for SSH logins
+  ansible.builtin.blockinfile:
+    path: "/etc/pam.d/sshd"
+    prepend_newline: true
+    insertafter: EOF
+    block: |
+        auth required pam_google_authenticator.so nullok"
 
 # - name: Set ChallengeResponseAuthentication to Yes
 #   lineinfile:
@@ -606,6 +609,18 @@ En definitiva, el archivo `.yml` de este apartado cumplirá los siguientes objet
 #   notify: "Restart SSH Server"
 ```
 
+<!--
+4ª (Configure PAM to use GoogleAuthenticator for SSH logins)
+
+This task tells PAM about the Google Authenticator module. It uses the
+Ansible lineinfile module again to edit the PAM sshd file. This time, you
+just want to add the auth line to the bottom of the PAM file, which lets PAM
+know it should use Google Authenticator as an authentication mechanism.
+The nullok option at the end of the line tells PAM that this authentication
+method is optional, which allows you to avoid locking out users until they
+have successfully configured 2FA. In a production environment, you should
+remove the nullok option once all users have enabled 2FA.
+-->
 
 <!-- ### Proyecto 2. Terraform -->
 <!-- ### Proyecto 3. Kubernetes + CI/CD -->
