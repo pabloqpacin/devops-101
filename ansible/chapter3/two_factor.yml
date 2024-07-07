@@ -1,8 +1,8 @@
 - name: Install the libpam-google-authenticator package
   apt:
     name: "libpam-google-authenticator"
-    # # NOTE: will update even if installed
-    # update_cache: yes
+    # NOTE: will update even if installed
+    update_cache: yes
     state: present
 
 - name: Copy over Preconfigured GoogleAuthenticator config

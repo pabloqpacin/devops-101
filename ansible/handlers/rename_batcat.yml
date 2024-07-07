@@ -1,0 +1,11 @@
+---
+- name: Check batcat existence and handle
+  block:
+    - name: Search for batcat
+      register: batcat
+      ansible.builtin.stat:
+        path: /usr/bin/batcat
+
+    - name: Handle batcat existence
+      command: mv /usr/bin/batcat /usr/bin/bat
+      when: batcat.stat.exists

@@ -1,18 +1,18 @@
 ---
-- name: Install bat
-  package:
-    name: "bat"
-    state: present
+# - name: Install bat
+#   package:
+#     name: "bat"
+#     state: present
 
-- name: Search for batcat
-  register: batcat
-  ansible.builtin.stat:
-    path: /usr/bin/batcat
+# - name: Search for batcat
+#   register: batcat
+#   ansible.builtin.stat:
+#     path: /usr/bin/batcat
 
-- name: Rename to bat if batcat
-  # command: ln -s /usr/bin/batcat /usr/bin/bat
-  command: mv /usr/bin/batcat /usr/bin/bat
-  when: batcat.stat.exists
+# - name: Rename to bat if batcat
+#   # command: ln -s /usr/bin/batcat /usr/bin/bat
+#   command: mv /usr/bin/batcat /usr/bin/bat
+#   when: batcat.stat.exists
 
 
 # ---
