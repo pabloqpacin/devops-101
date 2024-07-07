@@ -1,0 +1,10 @@
+devel -> add && commit && push
+feature-branch -> merge --squash && commit && push
+main -> PR feature-branch *(Squash and merge)
+
+main -> pull
+main -> branch -d feature-branch && push origin --delete feature-branch
+main -> checkout -b feature-branch
+feature-branch -> push --set-upstream origin feature-branch
+devel -> fetch origin && merge origin/main && push
+
