@@ -13,4 +13,4 @@
     # - import_tasks: chapter4/sudoers.yml
     # - import_tasks: chapter5/firewall.yml
   handlers:
-    #  - import_tasks: handlers/restart_ssh.yml
+    - import_tasks: handlers/restart_ssh.yml
