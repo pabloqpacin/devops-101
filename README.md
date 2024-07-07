@@ -15,6 +15,9 @@
         - [`pam_pwquality.yml`](#pam_pwqualityyml)
         - [`user_and_group.yml`](#user_and_groupyml)
         - [Demo: usuarios y permisos](#demo-usuarios-y-permisos)
+      - [1.6 (Ch. 3) Ansible: ssh and 2FA](#16-ch-3-ansible-ssh-and-2fa)
+        - [Generar claves ssh y `authorized_keys.yml`](#generar-claves-ssh-y-authorized_keysyml)
+        - [`two_factor.yml` y `google_authenticator`](#two_factoryml-y-google_authenticator)
 
 
 ## Entornos de desarrollo y operaciones
@@ -176,7 +179,7 @@ sudo apt install -y ansible
 
 #### 1.2 Configuraciones: hardware, VirtualBox, Vagrant
 
-Hemos preparado [el script `vagrant_vbox_env.sh`](/vagrant/vagrant_vbox_env.sh) para realizar varias tareas importantes.
+Hemos preparado [el script `vagrant_vbox_env.sh`](/scripts/vagrant_vbox_env.sh) para realizar varias tareas importantes.
 
 1. Asignar a la variable de entorno `$VAGRANT_HOME` el valor `/var/vagrant.d` (por defecto sería `~/.vagrant.d`). Aquí se almacenarán varios archivos de configuración de **Vagrant**. Cada imagen o *box* que descarguemos pesará medio GB así que puede llegar a pesar mucho y preferimos dejar este tipo de *bloat* fuera de `/home`.
 
@@ -199,8 +202,8 @@ VBoxManage setproperty machinefolder /media/$USER/LAB/VBox
 Hacemos que la shell (*zsh* o *bash*) ejecute nuestro script verificador al iniciarse.
 
 ```bash
-echo -e "\nsource ~/devops_101/vagrant/vagrant_vbox_env.sh" >> ~/.zshrc || \
-echo -e "\nsource ~/devops_101/vagrant/vagrant_vbox_env.sh" >> ~/.bashrc
+echo -e "\nsource ~/devops_101/scripts/vagrant_vbox_env.sh" >> ~/.zshrc || \
+echo -e "\nsource ~/devops_101/scripts/vagrant_vbox_env.sh" >> ~/.bashrc
 ```
 
 Con todo preparado, podemos iniciar una nueva shell e instalar los plugins necesarios para este proyecto.
@@ -475,6 +478,182 @@ ls -la /opt/engineering/
     # drwxr-xr-x 3 root root       4096 Jul  6 14:54 ..
     # -rwxrwx--- 1 root developers    4 Jul  6 15:07 private.txt
 ```
+
+#### 1.6 (Ch. 3) Ansible: ssh and 2FA
+
+Para el usuario *bender* de nuestra VM. Desactivaremos el acceso por ssh con contraseña y habilitaremos 2FA con **llaves ssh** y *google authenticator*.
+
+##### Generar claves ssh y `authorized_keys.yml`
+
+En nuestra máquina de operaciones generamos nuevas claves **ssh** (privada y pública). El siguiente comando nos pedirá una *passphrase*, que debemos guardar en un gestor de contraseñas o similar.
+
+```bash
+ssh-keygen -t rsa -f ~/.ssh/dftd -C dftd
+
+# read -p "Passphrase para las llaves 'dftd': " passphrase
+# ssh-keygen -t rsa -f ~/.ssh/dftd -C dftd -N "$passphrase"
+```
+
+Ahora podemos editar nuestro `site.yml` para incluir el archivo `ansible/chapter3/authorized_keys.yml`.
+
+```yaml
+---
+- name: Set authorized key file from local user
+  authorized_key:
+    user: bender 
+    state: present
+    key: "{{ lookup('file', lookup('env','HOME') + '/.ssh/dftd.pub') }}"
+```
+
+
+##### `two_factor.yml` y `google_authenticator`
+
+<!--
+For this example, you’ll use a *time-based one-time password (TOTP)* to
+satisfy the “something you have” portion, along with your public key for
+access. You’ll use the `Google Authenticator` package to configure your VM to
+use TOTP tokens for logging in. These TOTP tokens are usually generated
+from an application like `oathtool` (*https://www.nongnu.org/oath-toolkit/*) and
+are valid for only a short period of time. I have taken the liberty of creating
+10 TOTP tokens that Ansible will use for you, but I will also show you how
+to use oathtool (more on this later).
+-->
+
+El segundo factor de autenticación va a ser **TOTP** (*Time-based one-time password*) mediante `GoogleAuthenticator`. Lo ideal sería, teniendo preparada la app de Android **Google Authenticator**, acceder como *bender* a la VM tras instalar el paquete `libpam-google-authenticate` (1ª tarea a continuación), ejecutarlo de la siguiente forma, escanear el QR con el móvil e introducir en la terminal el código que salga en la app.
+
+```bash
+google-authenticator -f -t -d -r 3 -R 30 -w 17 -e 10
+    # Warning: pasting the following URL into your browser exposes the OTP secret to Google:
+    #   https://www.google.com/chart?chs=200x200&chld=M|0&cht=qr&chl=otpauth://totp/vagrant@vagrant-ubuntu-2204%3Fsecret%3DX5AH<...>JT7Q%26issuer%3Dvagrant-ubuntu-2204
+    # <QR>
+    # Your new secret key is: X5AH<...>JT7Q
+    # Enter code from app (-1 to skip): 972935
+
+    # Code confirmed
+    # Your emergency scratch codes are:
+    #   11880927
+    #   35111193
+    #   32810950
+    #   87502136
+    #   81456931
+    #   79721071
+    #   31977925
+    #   28440037
+    #   12366122
+    #   65260038
+```
+
+Al completarse el proceso, se crea el archivo `~/.google_authenticator`. En este caso en lugar de generar todo esto, vamos a copiar un archivo proporcionado por el autor del **libro** (2ª tarea). Habrá que revisar esto, tema `oathtool` etc.
+
+> **IMPORTANTE**: de nuevo, no hay seguridad si publicamos en internet los tokens y las llaves secretas; lo suyo sería usar ***Ansible Vault***, [*HashiCorp's Vault*](https://www.vaultproject.io/) o algo similar.
+
+
+En definitiva, el archivo `.yml` de este apartado cumplirá los siguientes objetivos:
+1. Instalar `libpam-google-authenticate`
+2. Copiar un archivo de configuración de `GoogleAuthenticator` <!--OJO-->
+3. Desactivar el login por contraseña para **ssh** (mediante *PAM*)
+4. Configurar *PAM* para usar `GoogleAuthenticator` para el login de *bender* por **ssh**
+5. Activar `ChallengeResponseAuthentication` en el `sshd_config`
+6. Configurar Método de Autenticación para *bender*, *vagrant* y *ubuntu*
+7. Incluir handler "Restart SSH Server"
+
+<!-- > **NOTA**: diferencias frente al repo del autor: en el `Vagrantfile` hemos cambiado la *box* `focal64` por `jammy64`, Ubuntu 20.04 y 22.04 respectivamente. Esto ha supuesto que el paquete `ssh` tenga una versión más reciente y un **conclicto**, así que para la tarea *Set ChallengeResponseAuthentication to Yes* fue necesario cambiar la línea. -->
+
+```yaml
+- name: Install the libpam-google-authenticator package
+  apt:
+    name: "libpam-google-authenticator"
+    update_cache: yes
+    state: present
+
+- name: Copy over Preconfigured GoogleAuthenticator config
+  copy:
+    src: ../ansible/chapter3/google_authenticator
+    dest: /home/bender/.google_authenticator
+    owner: bender
+    group: bender
+    mode: '0600'
+  no_log: true
+
+- name: Disable password authentication for SSH
+  lineinfile:
+    dest: "/etc/pam.d/sshd"
+    regex: "@include common-auth"
+    line: "#@include common-auth"
+
+- name: Configure PAM to use GoogleAuthenticator for SSH logins
+  ansible.builtin.blockinfile:
+    path: "/etc/pam.d/sshd"
+    prepend_newline: true
+    insertafter: EOF
+    block: |
+        auth required pam_google_authenticator.so nullok"
+
+- name: Set ChallengeResponseAuthentication to Yes
+  lineinfile:
+    dest: "/etc/ssh/sshd_config"
+    regexp: "^KbdInteractiveAuthentication (yes|no)"
+    line: "KbdInteractiveAuthentication yes"
+    state: present
+
+- name: Set Authentication Methods for bender, vagrant, and ubuntu
+  blockinfile:
+    path: "/etc/ssh/sshd_config"
+    block: |
+      Match User "ubuntu,vagrant"
+          AuthenticationMethods publickey
+      Match User "bender,!vagrant,!ubuntu"
+          AuthenticationMethods publickey,keyboard-interactive
+    state: present
+  notify: "Restart SSH Server"
+```
+
+<!--
+4ª (Configure PAM to use GoogleAuthenticator for SSH logins)
+
+This task tells PAM about the Google Authenticator module. It uses the
+Ansible lineinfile module again to edit the PAM sshd file. This time, you
+just want to add the auth line to the bottom of the PAM file, which lets PAM
+know it should use Google Authenticator as an authentication mechanism.
+The nullok option at the end of the line tells PAM that this authentication
+method is optional, which allows you to avoid locking out users until they
+have successfully configured 2FA. In a production environment, you should
+remove the nullok option once all users have enabled 2FA.
+-->
+
+<!-- 5ª -->
+<!-- 6ª -->
+<!-- 7ª -->
+
+<!-- oathtool -->
+
+> **OJO**: Ansible *handlers*...
+
+Ahora deberíamos conectarnos a la VM como *bender* y se nos pedirá tanto la *passphrase* de nuestra llave **ssh** y  los tokens de *Google Authenticator* (al usar uno, se elimina automáticamente de `~/.google_authenticator`).
+
+
+```bash
+# # Tener en cuenta el puerto si hay varias VMs funcionando
+# vagrant ssh-config
+# PORT=$(vagrant ssh-config | grep 'Port' | awk '{print $2}')
+
+# Conexión a la VM
+ssh -i ~/.ssh/dftd -p 2222 bender@localhost
+
+# # Si hay problemas
+# vagrant ssh
+# less /var/log/auth.log
+# less /var/log/syslog
+```
+
+- [ ] Revisar el tema para hacerlo TOTP, incluso compatible con Android apps
+- [ ] Curiosamente todavía podemos acceder con `vagrant ssh`... ¿No deberíamos caparlo?
+
+
+
+
+
+
 
 
 

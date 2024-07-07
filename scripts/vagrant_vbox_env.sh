@@ -9,6 +9,8 @@ if command -v vagrant &>/dev/null; then
         '/var/vagrant.d') echo "OK" > /dev/null ;;
         '' | '~/.vagrant.d' | *) export VAGRANT_HOME="/var/vagrant.d" ;;
     esac
+
+    # TODO: check env. var. regarding syncfolders...
 fi
 
 ### Hardware/VirtualBox VMs storage

@@ -14,6 +14,12 @@
     name: "zsh"
     state: present
 
+- name: Install bat
+  package:
+    name: "bat"
+    state: present
+  # notify: "Check batcat existence and handle"
+
 
 # ---
 
