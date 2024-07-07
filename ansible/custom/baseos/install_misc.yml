@@ -18,7 +18,7 @@
   package:
     name: "bat"
     state: present
-  notify: "Check batcat existence and handle"
+  # notify: "Check batcat existence and handle"
 
 
 # ---

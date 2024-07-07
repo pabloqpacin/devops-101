@@ -13,4 +13,4 @@
     #  - import_tasks: custom/dotfiles/zsh.yml
     #  - import_tasks: custom/dotfiles/bat.yml
   handlers:
-    - import_tasks: handlers/rename_batcat.yml
+    # - import_tasks: handlers/rename_batcat.yml
