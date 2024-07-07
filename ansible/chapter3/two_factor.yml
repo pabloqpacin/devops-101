@@ -35,23 +35,25 @@
     path: "/etc/pam.d/sshd"
     prepend_newline: true
     # insertafter: EOF
-    block: auth required pam_google_authenticator.so nullok"
+    block: auth required pam_google_authenticator.so nullok
 
-# - name: Set ChallengeResponseAuthentication to Yes
-#   lineinfile:
-#     dest: "/etc/ssh/sshd_config"
-#     regexp: "^ChallengeResponseAuthentication (yes|no)"
-#     line: "ChallengeResponseAuthentication yes"
-#     state: present
+- name: Set ChallengeResponseAuthentication to Yes
+  lineinfile:
+    dest: "/etc/ssh/sshd_config"
+    # regexp: "^ChallengeResponseAuthentication (yes|no)"
+    # line: "ChallengeResponseAuthentication yes"
+    regexp: "^KbdInteractiveAuthentication (yes|no)"
+    line: "KbdInteractiveAuthentication yes"
+    state: present
 
-# - name: Set Authentication Methods for bender, vagrant, and ubuntu
-#   blockinfile:
-#     path: "/etc/ssh/sshd_config"
-#     prepend_newline: true
-#     block: |
-#       Match User "ubuntu,vagrant"
-#           AuthenticationMethods publickey
-#       Match User "bender,!vagrant,!ubuntu"
-#           AuthenticationMethods publickey,keyboard-interactive
-#     state: present
-#   notify: "Restart SSH Server"
+- name: Set Authentication Methods for bender, vagrant, and ubuntu
+  blockinfile:
+    path: "/etc/ssh/sshd_config"
+    prepend_newline: true
+    block: |
+      Match User "ubuntu,vagrant"
+          AuthenticationMethods publickey
+      Match User "bender,!vagrant,!ubuntu"
+          AuthenticationMethods publickey,keyboard-interactive
+    state: present
+  notify: "Restart SSH Server"
