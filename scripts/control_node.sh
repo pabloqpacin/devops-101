@@ -56,16 +56,21 @@ ch2_pass_and_hash_generation(){
     # sudo apt-get update
     sudo apt-get install pwgen whois
     
-    # read -p "Username: " user
-    pass=$(pwgen --secure --capitalize --numerals --symbols 12 1)
-    {
-        # echo $user
-        echo $pass
-        echo $pass | mkpasswd --stdin --method=sha-512
-        echo ""
-    } | tee -a ~/devops_101/ansible/chapter2/.password_hash.txt
-    # unset user
-    unset pass
+    # NOTE: esto nos da igual porque vamos a desactivar contras y usar 2FA (llaves ssh y TOTP)
+    read -p "¿Cuántos usuarios? " NUM
+    for ((i=1; i<=NUM; i++)); do
+        # read -p "Username: " user
+        pass=$(pwgen --secure --capitalize --numerals --symbols 12 1)
+        {
+            # echo $user
+            echo $pass
+            echo $pass | mkpasswd --stdin --method=sha-512
+            echo ""
+        } | tee -a ~/devops_101/ansible/chapter2/.password_hash.txt
+        # unset user
+        unset pass
+    done
+    unset NUM
 }
 
 ch3_ssh_keys_generation(){
@@ -77,6 +82,10 @@ ch3_ssh_keys_generation(){
         unset $passphrase
     fi
 }
+
+# ch3_oathtool(){
+#     # ...
+# }
 
 
 # ---
