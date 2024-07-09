@@ -1,0 +1,27 @@
+---
+- name: Set default EDITOR for multiple users
+  hosts: all
+  become: yes
+
+  vars:
+    users:
+      - bender
+      - leela
+      - fry
+      - amy
+      - zoidberg
+
+  tasks:
+    - name: Create users with specific shell
+      user:
+        name: "{{ item }}"
+        shell: /bin/bash
+      loop: "{{ users }}"
+
+    - name: Set default EDITOR for each user
+      ansible.builtin.blockinfile:
+        path: "/home/{{ item }}/.bashrc"
+        prepend_newline: true
+        block: |
+          'export EDITOR=vim'
+      loop: "{{ users }}"

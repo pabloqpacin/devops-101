@@ -9,6 +9,12 @@
     shell: /usr/bin/zsh
     password: $6$OStSJfA6FA$ffSDaJBWfSpmnwlC6QWJwLG3PgZWQhPYUSezmRvSiUFpwSWy/57KuUuLg/4yGBpKx2TWYsPDz9Yq7nL2I2XT3/
 
+- name: Set default EDITOR for the user 'bender'
+  ansible.builtin.blockinfile:
+    path: "/home/bender/.bashrc"
+    prepend_newline: true
+    block: 'export EDITOR=vim'
+
 - name: Assign 'pabloqpacin' to the 'devops' group
   user:
     name: pabloqpacin
