@@ -87,6 +87,9 @@ ch3_ssh_keys_generation(){
 #     # ...
 # }
 
+ch5_install_nmap(){
+    sudo apt install nmap -y
+}
 
 # ---
 
@@ -96,6 +99,7 @@ if true; then
     ch1_vagrant_configuration
     ch2_pass_and_hash_generation
     ch3_ssh_keys_generation
+    ch5_install_nmap
 fi
 
 

@@ -18,6 +18,12 @@
       - [1.6 (Ch. 3) Ansible: ssh and 2FA](#16-ch-3-ansible-ssh-and-2fa)
         - [Generar claves ssh y `authorized_keys.yml`](#generar-claves-ssh-y-authorized_keysyml)
         - [`two_factor.yml` y `google_authenticator`](#two_factoryml-y-google_authenticator)
+      - [1.7 (Ch. 4) Webapp \& sudoers](#17-ch-4-webapp--sudoers)
+        - [`web_application.yml`, `greeting.service`, `greeting.py` y `wsgi.py`](#web_applicationyml-greetingservice-greetingpy-y-wsgipy)
+        - [`sudoers.yml` y `templates/developers.j2` (Jinja2)](#sudoersyml-y-templatesdevelopersj2-jinja2)
+        - [*Provisioning the VM*](#provisioning-the-vm)
+      - [1.8 (Ch. 5)  `ufw` firewall](#18-ch-5--ufw-firewall)
+        - [`firewall.yml`](#firewallyml)
 
 
 ## Entornos de desarrollo y operaciones
@@ -650,11 +656,190 @@ ssh -i ~/.ssh/dftd -p 2222 bender@localhost
 - [ ] Curiosamente todavía podemos acceder con `vagrant ssh`... ¿No deberíamos caparlo?
 
 
+#### 1.7 (Ch. 4) Webapp & sudoers
+
+
+##### `web_application.yml`, `greeting.service`, `greeting.py` y `wsgi.py`
+
+- [ ] Why Nginx tho? Is it so that UFW can block connection attempts?
+
+```yaml
+---
+- name: Install python3-flask, gunicorn3, and nginx
+  apt:
+    name:
+      - python3-flask
+      - gunicorn
+      - nginx
+    update_cache: yes
+
+- name: Copy Flask Sample Application
+  copy:
+    src: "../ansible/chapter4/{{ item }}"
+    dest: "/opt/engineering/{{ item }}"
+    group: developers
+    mode: '0750'
+  loop:
+    - greeting.py
+    - wsgi.py
+
+- name: Copy systemd Unit file for Greeting
+  copy:
+    src: "../ansible/chapter4/greeting.service"
+    dest: "/etc/systemd/system/greeting.service"
+
+- name: Start and enable Greeting Application
+  systemd:
+    name: greeting.service
+    daemon_reload: yes
+    state: started
+    enabled: yes
+```
+
+##### `sudoers.yml` y `templates/developers.j2` (Jinja2)
+
+```yaml
+---
+- set_fact:
+    greeting_application_file: "/opt/engineering/greeting.py"
+
+- name: Create sudoers file for developers group
+  template:
+    src: "../ansible/templates/developers.j2"
+    dest: "/etc/sudoers.d/developers"
+    validate: 'visudo -cf %s'
+    owner: root
+    group: root
+    mode: 0440
+```
+
+```j2
+# Command alias
+Cmnd_Alias	START_GREETING    = /bin/systemctl start greeting , \
+				    /bin/systemctl start greeting.service
+Cmnd_Alias	STOP_GREETING     = /bin/systemctl stop greeting , \
+				    /bin/systemctl stop greeting.service
+Cmnd_Alias	RESTART_GREETING  = /bin/systemctl restart greeting , \
+				    /bin/systemctl restart greeting.service
+
+# Host Alias
+Host_Alias      LOCAL_VM = {{ hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }}
+# User specification
+%developers LOCAL_VM = (root) NOPASSWD: START_GREETING, STOP_GREETING, \
+	    	       RESTART_GREETING, \
+		       sudoedit {{ greeting_application_file }}
+
+```
+
+##### *Provisioning the VM*
+
+```bash
+vagrant provision
+
+ssh -i ~/.ssh/dftd -p 2222 bender@localhost
+```
+```bash
+curl http://localhost:5000
+
+# # NO usar sudo, pide contraseña...
+# sed -i 's/Greetings/Greetings and Salutations/' /opt/engineering/greeting.py
+
+# Usamos sudoedit, según /etc/sudoers.d/developers
+sudoedit /opt/engineering/greeting.py
+
+sudo systemctl restart greeting
+# sudo systemctl stop greeting
+# curl -w "\n" http://localhost:5000
+# sudo systemctl start greeting
+curl -w "\n" http://localhost:5000
+
+# No podremos, y ahora lo veremos revisando el propio log
+sudo tail -f /var/log/auth.log
+```
+
+Para revisar los logs nos logueamos como *vagrant*. 
+
+```bash
+vagrant ssh
+
+# less /var/log/auth.log
+grep 'sudo' /var/log/auth.log | grep 'bender' | grep 'COMMAND'
+```
 
 
 
+#### 1.8 (Ch. 5)  `ufw` firewall
+
+##### `firewall.yml`
+
+- Whitelisting.
+
+```yaml
+---
+
+- name: Turn Logging level to low
+  ufw:
+    logging: 'low'
+
+- name: Allow SSH over port 22
+  ufw:
+    rule: allow
+    port: '22'
+    proto: tcp
+
+- name: Allow all access to port 5000
+  ufw:
+    rule: allow
+    port: '5000'
+    proto: tcp
+
+- name: Rate limit excessive abuse on port 5000
+  ufw:
+    rule: limit
+    port: '5000'
+    proto: tcp
 
 
+- name: Drop all other traffic
+  ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+```
+
+```bash
+vagrant provision && vagrant ssh
+sudo sed -i 's/hitcount 6/hitcount 10/' /etc/ufw/user.rules
+
+VM_IP=$(ip -4 -br a | tail -n 1 | awk '{print $3}')
+  # 192.168.1.43/24
+```
+
+Desde un pc real de la red real escaneamos la VM:
+
+
+```bash
+nmap -F 192.168.1.43
+  # Host seems down
+
+nmap -Pn 192.168.1.43
+  # Ports 22 & 5000
+
+nmap -Pn -sV 192.168.1.43
+  # OpenSSH 8.9
+  # upnp?
+
+for i in {1..6} ; do curl -w "\n" http://192.168.1.43:5000 ; done
+  # A la sexta, Connection refused
+```
+
+Volvemos a loguearnos como admin para revisar logs:
+
+```bash
+vagrant ssh
+
+sudo less /var/log/ufw.log
+```
 
 
 

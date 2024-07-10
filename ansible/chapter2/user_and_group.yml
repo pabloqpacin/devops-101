@@ -9,6 +9,12 @@
     shell: /bin/bash
     password: $6$QJmzvbMhlt7C.qOO$uSkIZs/nINf2HFR/.nerO3qfRzIOR53BwZVwJspkkKdrO1KLOzIcW7hG7UWAhGTh/VJVvxhbZO7qloGqGs30E/
 
+- name: Set default EDITOR for the user 'bender'
+  ansible.builtin.blockinfile:
+    path: "/home/bender/.bashrc"
+    prepend_newline: true
+    block: 'export EDITOR=vim'
+
 - name: Assign 'bender' to the 'developers' group
   user:
     name: bender
