@@ -3,6 +3,7 @@
 > ***DevOps for the Desperate**. A Hands-On Survival Guide*. [Libro](https://nostarch.com/devops-desperate), [repo](https://github.com/bradleyd/devops_for_the_desperate).
 
 - [devops\_101](#devops_101)
+- [||||||| d8efb9b](#-d8efb9b)
   - [Entornos de desarrollo y operaciones](#entornos-de-desarrollo-y-operaciones)
   - [Objetivos](#objetivos)
   - [Proyectos](#proyectos)
@@ -23,6 +24,8 @@
         - [`sudoers.yml` y `templates/developers.j2` (Jinja2)](#sudoersyml-y-templatesdevelopersj2-jinja2)
         - [*Provisioning the VM*](#provisioning-the-vm)
       - [1.8 (Ch. 5)  `ufw` firewall](#18-ch-5--ufw-firewall)
+        - [`firewall.yml`](#firewallyml)
+>>>>>>> devel
 
 
 ## Entornos de desarrollo y operaciones
@@ -769,7 +772,76 @@ grep 'sudo' /var/log/auth.log | grep 'bender' | grep 'COMMAND'
 
 #### 1.8 (Ch. 5)  `ufw` firewall
 
+##### `firewall.yml`
 
+- Whitelisting.
+
+```yaml
+---
+
+- name: Turn Logging level to low
+  ufw:
+    logging: 'low'
+
+- name: Allow SSH over port 22
+  ufw:
+    rule: allow
+    port: '22'
+    proto: tcp
+
+- name: Allow all access to port 5000
+  ufw:
+    rule: allow
+    port: '5000'
+    proto: tcp
+
+- name: Rate limit excessive abuse on port 5000
+  ufw:
+    rule: limit
+    port: '5000'
+    proto: tcp
+
+
+- name: Drop all other traffic
+  ufw:
+    state: enabled
+    policy: deny
+    direction: incoming
+```
+
+```bash
+vagrant provision && vagrant ssh
+sudo sed -i 's/hitcount 6/hitcount 10/' /etc/ufw/user.rules
+
+VM_IP=$(ip -4 -br a | tail -n 1 | awk '{print $3}')
+  # 192.168.1.43/24
+```
+
+Desde un pc real de la red real escaneamos la VM:
+
+
+```bash
+nmap -F 192.168.1.43
+  # Host seems down
+
+nmap -Pn 192.168.1.43
+  # Ports 22 & 5000
+
+nmap -Pn -sV 192.168.1.43
+  # OpenSSH 8.9
+  # upnp?
+
+for i in {1..6} ; do curl -w "\n" http://192.168.1.43:5000 ; done
+  # A la sexta, Connection refused
+```
+
+Volvemos a loguearnos como admin para revisar logs:
+
+```bash
+vagrant ssh
+
+sudo less /var/log/ufw.log
+```
 
 
 
