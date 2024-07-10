@@ -3,7 +3,6 @@
 > ***DevOps for the Desperate**. A Hands-On Survival Guide*. [Libro](https://nostarch.com/devops-desperate), [repo](https://github.com/bradleyd/devops_for_the_desperate).
 
 - [devops\_101](#devops_101)
-- [||||||| d8efb9b](#-d8efb9b)
   - [Entornos de desarrollo y operaciones](#entornos-de-desarrollo-y-operaciones)
   - [Objetivos](#objetivos)
   - [Proyectos](#proyectos)
@@ -25,7 +24,6 @@
         - [*Provisioning the VM*](#provisioning-the-vm)
       - [1.8 (Ch. 5)  `ufw` firewall](#18-ch-5--ufw-firewall)
         - [`firewall.yml`](#firewallyml)
->>>>>>> devel
 
 
 ## Entornos de desarrollo y operaciones
