@@ -18,7 +18,7 @@
     unset DISTRO
 }
 
-ch1_vagrant_and_ansible_installation(){
+p1_ch1_vagrant_and_ansible_installation(){
     if ! command -v vagrant &>/dev/null; then
         wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
         echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | \
@@ -34,7 +34,7 @@ ch1_vagrant_and_ansible_installation(){
     fi
 }
 
-ch1_vagrant_configuration(){
+p1_ch1_vagrant_configuration(){
     if [ -d ~/devops_101 ]; then
         echo -e "\nsource ~/devops_101/scripts/vagrant_vbox_env.sh" >> ~/.zshrc || \
         echo -e "\nsource ~/devops_101/scripts/vagrant_vbox_env.sh" >> ~/.bashrc
@@ -52,7 +52,7 @@ ch1_vagrant_configuration(){
     fi
 }
 
-ch2_pass_and_hash_generation(){
+p1_ch2_pass_and_hash_generation(){
     # sudo apt-get update
     sudo apt-get install pwgen whois
     
@@ -73,7 +73,7 @@ ch2_pass_and_hash_generation(){
     unset NUM
 }
 
-ch3_ssh_keys_generation(){
+p1_ch3_ssh_keys_generation(){
     if [ ! -e ~/.ssh/dftd ]; then
         read -p "Enter a passphrase for the new 'dftd' ssh keys: " passphrase
         echo "Passphrase for '~/.ssh/dftd': $passphrase" | \
@@ -87,7 +87,7 @@ ch3_ssh_keys_generation(){
 #     # ...
 # }
 
-ch5_install_nmap(){
+p1_ch5_install_nmap(){
     sudo apt install nmap -y
 }
 
@@ -95,11 +95,11 @@ ch5_install_nmap(){
 
 if true; then
     0_verificar_distro
-    ch1_vagrant_and_ansible_installation
-    ch1_vagrant_configuration
-    ch2_pass_and_hash_generation
-    ch3_ssh_keys_generation
-    ch5_install_nmap
+    p1_ch1_vagrant_and_ansible_installation
+    p1_ch1_vagrant_configuration
+    p1_ch2_pass_and_hash_generation
+    p1_ch3_ssh_keys_generation
+    p1_ch5_install_nmap
 fi
 
 

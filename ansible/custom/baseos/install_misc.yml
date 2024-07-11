@@ -1,4 +1,14 @@
 ---
+# - name: Install bat, curl, git, and zsh
+#   apt:
+#     name:
+#       - bat
+#       - curl
+#       - git
+#       - zsh
+#     update_cache: yes
+
+
 - name: Install curl
   package:
     name: "curl"
