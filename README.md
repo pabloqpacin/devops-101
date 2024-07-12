@@ -18,12 +18,16 @@
       - [1.6 (Ch. 3) Ansible: ssh and 2FA](#16-ch-3-ansible-ssh-and-2fa)
         - [Generar claves ssh y `authorized_keys.yml`](#generar-claves-ssh-y-authorized_keysyml)
         - [`two_factor.yml` y `google_authenticator`](#two_factoryml-y-google_authenticator)
-      - [1.7 (Ch. 4) Webapp \& sudoers](#17-ch-4-webapp--sudoers)
+      - [1.7 (Ch. 4) Webapp \& sudoers (con Jinja)](#17-ch-4-webapp--sudoers-con-jinja)
         - [`web_application.yml`, `greeting.service`, `greeting.py` y `wsgi.py`](#web_applicationyml-greetingservice-greetingpy-y-wsgipy)
         - [`sudoers.yml` y `templates/developers.j2` (Jinja2)](#sudoersyml-y-templatesdevelopersj2-jinja2)
         - [*Provisioning the VM*](#provisioning-the-vm)
       - [1.8 (Ch. 5)  `ufw` firewall](#18-ch-5--ufw-firewall)
         - [`firewall.yml`](#firewallyml)
+    - [Proyecto 2. Docker (en *Minikube*), Kubernetes y CI/CD pipelines](#proyecto-2-docker-en-minikube-kubernetes-y-cicd-pipelines)
+        - [2.1 (Ch. 6) Instalación de minikube y docker-client](#21-ch-6-instalación-de-minikube-y-docker-client)
+        - [2.2 Imagen Docker de aplicación `telnet-server`](#22-imagen-docker-de-aplicación-telnet-server)
+        - [2.3 Demo de aplicación `telnet-server` (en Docker), revisión de logs](#23-demo-de-aplicación-telnet-server-en-docker-revisión-de-logs)
 
 
 ## Entornos de desarrollo y operaciones
@@ -656,7 +660,7 @@ ssh -i ~/.ssh/dftd -p 2222 bender@localhost
 - [ ] Curiosamente todavía podemos acceder con `vagrant ssh`... ¿No deberíamos caparlo?
 
 
-#### 1.7 (Ch. 4) Webapp & sudoers
+#### 1.7 (Ch. 4) Webapp & sudoers (con Jinja)
 
 
 ##### `web_application.yml`, `greeting.service`, `greeting.py` y `wsgi.py`
@@ -842,6 +846,192 @@ sudo less /var/log/ufw.log
 ```
 
 
+### Proyecto 2. Docker (en *Minikube*), Kubernetes y CI/CD pipelines
+
+##### 2.1 (Ch. 6) Instalación de minikube y docker-client
+
+En la misma máquina EX2511.
+
+Valores por defecto de `minikube start`: `--cpus=2 --memory='3900m' --disk-size='20g'`
+
+
+```bash
+cd /tmp
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube_latest_amd64.deb
+# sudo dpkg -i minikube_latest_amd64.deb
+cd -
+```
+
+Necesario iniciar minikube cada vez que queramos usarlo...
+
+```bash
+# minikube start --driver=virtualbox
+minikube start
+```
+<!--
+```log
+pabloqpacin@pop-os ~$ minikube start
+* minikube v1.33.1 on Debian bookworm/sid
+* Automatically selected the virtualbox driver. Other choices: none, ssh
+* Downloading VM boot image ...
+    > minikube-v1.33.1-amd64.iso....:  65 B / 65 B [---------] 100.00% ? p/s 0s
+    > minikube-v1.33.1-amd64.iso:  314.16 MiB / 314.16 MiB  100.00% 41.96 MiB p
+* Starting "minikube" primary control-plane node in "minikube" cluster
+* Downloading Kubernetes v1.30.0 preload ...
+    > preloaded-images-k8s-v18-v1...:  342.90 MiB / 342.90 MiB  100.00% 38.13 M
+* Creating virtualbox VM (CPUs=2, Memory=3900MB, Disk=20000MB) ...
+* Preparing Kubernetes v1.30.0 on Docker 26.0.2 ...
+  - Generating certificates and keys ...
+  - Booting up control plane ...
+  - Configuring RBAC rules ...
+* Configuring bridge CNI (Container Networking Interface) ...
+* Verifying Kubernetes components...
+  - Using image gcr.io/k8s-minikube/storage-provisioner:v5
+* Enabled addons: default-storageclass, storage-provisioner
+* kubectl not found. If you need it, try: 'minikube kubectl -- get pods -A'
+* Done! kubectl is now configured to use "minikube" cluster and "default" namespace by default
+```
+ -->
+
+```bash
+sudo apt install docker-ce-cli
+
+echo "eval $(minikube -p minikube docker-env)" >> ~/.zshrc || \
+echo "eval $(minikube -p minikube docker-env)" >> ~/.bashrc
+
+docker version
+```
+
+##### 2.2 Imagen Docker de aplicación `telnet-server`
+
+Contenido del directorio `telnet-server/`:
+
+```log
+*[main][~/devops_101]$ tree telnet-server
+ devops_101/telnet-server
+├──  container-tests
+│  └──  command-and-metadata-test.yaml
+├──  kubernetes
+│  ├──  deployment.yaml
+│  └──  service.yaml
+├──  metrics
+│  └──  server.go
+├──  telnet
+│  ├──  banner.go
+│  ├──  server.go
+│  └──  server_test.go
+├──  build.sh
+├──  Dockerfile
+├──  go.mod
+├──  go.sum
+├──  main.go
+└──  skaffold.yaml
+```
+
+Dockerfile para ***multistage** build*:
+
+```dockerfile
+# Build stage
+FROM golang:alpine AS build-env
+ADD . /
+RUN cd / && go build -o telnet-server
+
+# final stage
+FROM alpine:latest as final
+WORKDIR /app
+ENV TELNET_PORT 2323
+ENV METRIC_PORT 9000
+COPY --from=build-env /telnet-server /app/
+
+ENTRYPOINT ["./telnet-server"]
+```
+
+Comandos para crear la imagen y ejecutar un contenedor:
+
+```bash
+# Crear la imagen
+docker build -t dftd/telnet-server:v1 .
+
+docker image ls dftd/telnet-server:v1
+docker history dftd/telnet-server:v1
+
+# Ejecutar contenedor (instancia de la imagen)
+docker run -d --name telnet-server -p 2323:2323 dftd/telnet-server:v1
+# docker container ls -f name=telnet-server
+docker ps -f name=telnet-server
+```
+
+Otros comandos `docker` importantes:
+
+```bash
+docker exec telnet-server env
+docker exec -it telnet-server /bin/sh
+
+docker inspect telnet-server
+  # State
+  # NetworkSettings
+
+docker stats --no-stream dftd/telnet-server
+```
+
+##### 2.3 Demo de aplicación `telnet-server` (en Docker), revisión de logs
+
+Instalamos el cliente `telnet` si es necesario e iniciamos `minikube` y el contenedor si hemos apagado la máquina.
+
+```bash
+sudo apt install telnet
+
+minikube start
+
+docker ps -f name=telnet-server
+docker start telnet-server
+docker ps -f name=telnet-server
+```
+
+Nos conectamos al servidor telnet del contenedor.
+
+```log
+[pabloqpacin:~]$ telnet $(minikube ip) 2323
+Trying 192.168.59.100...
+Connected to 192.168.59.100.
+Escape character is '^]'.
+
+____________ ___________
+|  _  \  ___|_   _|  _  \
+| | | | |_    | | | | | |
+| | | |  _|   | | | | | |
+| |/ /| |     | | | |/ /
+|___/ \_|     \_/ |___/
+
+>d
+Fri Jul 12 16:13:34 +0000 UTC 2024
+>q
+Good Bye!
+Connection closed by foreign host.
+[pabloqpacin:~]$
+```
+
+Revisamos los logs.
+
+```logs
+~ ᐅ docker logs telnet-server
+telnet-server: 2024/07/11 18:44:41 telnet-server listening on [::]:2323
+telnet-server: 2024/07/11 18:44:41 Metrics endpoint listening on :9000
+telnet-server: 2024/07/12 16:10:42 Metrics endpoint listening on :9000
+telnet-server: 2024/07/12 16:10:42 telnet-server listening on [::]:2323
+telnet-server: 2024/07/12 16:11:45 [IP=192.168.59.1] New session
+telnet-server: 2024/07/12 16:13:34 [IP=192.168.59.1] Requested command: d
+telnet-server: 2024/07/12 16:13:37 [IP=192.168.59.1] User quit session
+
+~ ᐅ docker logs --tail=2 telnet-server
+~ ᐅ docker logs -f telnet-server
+```
+
+
+
+
+
+<!-- ##### 2.4 (Ch. 7) Kubernetes... -->
 
 
 <!-- ### Proyecto 2. Terraform -->
