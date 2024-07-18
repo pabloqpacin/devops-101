@@ -28,7 +28,7 @@
         - [2.1 (Ch. 6) Instalación de minikube y docker-client](#21-ch-6-instalación-de-minikube-y-docker-client)
         - [2.2 Imagen Docker de aplicación `telnet-server`](#22-imagen-docker-de-aplicación-telnet-server)
         - [2.3 Demo de aplicación `telnet-server` (en Docker), revisión de logs](#23-demo-de-aplicación-telnet-server-en-docker-revisión-de-logs)
-        - [2.4 Kubernetes: `deployment.yaml` y `service.yaml`](#24-kubernetes-deploymentyaml-y-serviceyaml)
+        - [2.4 (Ch. 7) Kubernetes: `deployment.yaml` y `service.yaml`](#24-ch-7-kubernetes-deploymentyaml-y-serviceyaml)
 
 
 ## Entornos de desarrollo y operaciones
@@ -1029,7 +1029,7 @@ telnet-server: 2024/07/12 16:13:37 [IP=192.168.59.1] User quit session
 ```
 
 
-##### 2.4 Kubernetes: `deployment.yaml` y `service.yaml`
+##### 2.4 (Ch. 7) Kubernetes: `deployment.yaml` y `service.yaml`
 
 
 <details>
