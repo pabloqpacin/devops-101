@@ -1,5 +1,5 @@
 devel -> add && commit && push
-feature-branch -> merge --squash && commit && push
+feature-branch -> merge --squash devel && commit && push
 main -> PR feature-branch *(Squash and merge)
 
 main -> pull

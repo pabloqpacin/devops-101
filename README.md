@@ -28,6 +28,7 @@
         - [2.1 (Ch. 6) Instalación de minikube y docker-client](#21-ch-6-instalación-de-minikube-y-docker-client)
         - [2.2 Imagen Docker de aplicación `telnet-server`](#22-imagen-docker-de-aplicación-telnet-server)
         - [2.3 Demo de aplicación `telnet-server` (en Docker), revisión de logs](#23-demo-de-aplicación-telnet-server-en-docker-revisión-de-logs)
+        - [2.4 (Ch. 7) Kubernetes: `deployment.yaml` y `service.yaml`](#24-ch-7-kubernetes-deploymentyaml-y-serviceyaml)
 
 
 ## Entornos de desarrollo y operaciones
@@ -1027,6 +1028,152 @@ telnet-server: 2024/07/12 16:13:37 [IP=192.168.59.1] User quit session
 ~ ᐅ docker logs -f telnet-server
 ```
 
+
+##### 2.4 (Ch. 7) Kubernetes: `deployment.yaml` y `service.yaml`
+
+
+<details>
+<summary>Archivos .yaml</summary>
+
+`deployment.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telnet-server
+  labels:
+    app: telnet-server
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: telnet-server
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # how many pods we can add at a time
+      maxUnavailable: 0  # maxUnavailable define how many pods can be unavailable
+  template:
+    metadata:
+      labels:
+        app: telnet-server
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port:   '9000'
+    spec:
+      containers:
+      - image: dftd/telnet-server:v1
+        imagePullPolicy: IfNotPresent
+        name: telnet-server
+        resources:
+          requests:
+            cpu: 0.1
+            memory: 1M
+          limits:
+            cpu: 0.5
+            memory: 100M
+        ports:
+        - containerPort: 2323
+          name: telnet
+        - containerPort: 9000
+          name: metrics
+```
+
+`service.yaml`:
+
+```yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: telnet-server
+  labels:
+    app: telnet-server
+spec:
+  ports:
+  - port: 2323
+    name: telnet
+    protocol: TCP
+    targetPort: 2323
+  selector:
+    app: telnet-server
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: telnet-server-metrics
+  labels:
+    app: telnet-server
+  annotations:
+      prometheus.io/scrape: 'true'
+      prometheus.io/port:   '9000'
+
+spec:
+  ports:
+  - name: metrics
+    port: 9000
+    protocol: TCP
+    targetPort: 9000
+  selector:
+    app: telnet-server
+  type: ClusterIP
+```
+
+</details>
+
+
+Puesta en marcha:
+
+```bash
+# minikube start
+
+minikube kubectl cluster-info
+  # Kubernetes control plane is running at https://192.168.59.100:8443
+  # CoreDNS is running at https://192.168.59.100:8443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+  # To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+
+minikube kubectl -- explain deployment.metadata.labels
+```
+```bash
+minikube kubectl -- apply -f telnet-server/kubernetes/
+
+minikube kubectl -- get deployments.apps telnet-server
+minikube kubectl -- get pods -l app=telnet-server
+
+minikube kubectl -- get services -l app=telnet-server
+```
+
+```bash
+minikube tunnel
+  # ...
+
+minikube kubectl -- get services telnet-server
+  # OJO con EXTERNAL-IP (10.105.23.82)
+
+telnet 10.105.23.82 2323
+  # d
+  # q
+
+# minikube kubectl -- get endpoints -l app=telnet-server
+```
+
+```bash
+minikube kubectl -- get pods -l app=telnet-server
+minikube kubectl -- delete pod <telnet-server-775769766-2bmd5>
+minikube kubectl -- get pods -l app=telnet-server
+```
+
+```bash
+# Para **escalar**: modificar los archivos bajo control de versiones y comando `apply`. Igualmente así se hace por comandos, pero mejor evitar esta práctica:
+minikube kubectl -- scale deployment telnet-server --replicas=3
+```
+
+```bash
+minikube kubectl -- logs
+minikube kubectl -- logs -l app=telnet-server --all-containers=true --prefix=true
+```
 
 
 
