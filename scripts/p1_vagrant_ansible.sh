@@ -41,7 +41,7 @@ ch1_configure_vagrant(){
     fi
 }
 
-ch2_pass_and_hash_generation(){
+p1_ch2_pass_and_hash_generation(){
     # sudo apt-get update
     sudo apt-get install pwgen whois
     
@@ -76,7 +76,7 @@ ch2_pass_and_hash_generation(){
 #     # ...
 # }
 
-ch5_install_nmap(){
+p1_ch5_install_nmap(){
     sudo apt install nmap -y
 }
 
