@@ -18,12 +18,18 @@
       - [1.6 (Ch. 3) Ansible: ssh and 2FA](#16-ch-3-ansible-ssh-and-2fa)
         - [Generar claves ssh y `authorized_keys.yml`](#generar-claves-ssh-y-authorized_keysyml)
         - [`two_factor.yml` y `google_authenticator`](#two_factoryml-y-google_authenticator)
-      - [1.7 (Ch. 4) Webapp \& sudoers](#17-ch-4-webapp--sudoers)
+      - [1.7 (Ch. 4) Webapp \& sudoers (con Jinja)](#17-ch-4-webapp--sudoers-con-jinja)
         - [`web_application.yml`, `greeting.service`, `greeting.py` y `wsgi.py`](#web_applicationyml-greetingservice-greetingpy-y-wsgipy)
         - [`sudoers.yml` y `templates/developers.j2` (Jinja2)](#sudoersyml-y-templatesdevelopersj2-jinja2)
         - [*Provisioning the VM*](#provisioning-the-vm)
       - [1.8 (Ch. 5)  `ufw` firewall](#18-ch-5--ufw-firewall)
         - [`firewall.yml`](#firewallyml)
+    - [Proyecto 2. Docker (en *Minikube*), Kubernetes y CI/CD pipelines](#proyecto-2-docker-en-minikube-kubernetes-y-cicd-pipelines)
+        - [2.1 (Ch. 6) Instalación de minikube y docker-client](#21-ch-6-instalación-de-minikube-y-docker-client)
+        - [2.2 Imagen Docker de aplicación `telnet-server`](#22-imagen-docker-de-aplicación-telnet-server)
+        - [2.3 Demo de aplicación `telnet-server` (en Docker), revisión de logs](#23-demo-de-aplicación-telnet-server-en-docker-revisión-de-logs)
+        - [2.4 (Ch. 7) Kubernetes: `deployment.yaml` y `service.yaml`](#24-ch-7-kubernetes-deploymentyaml-y-serviceyaml)
+        - [2.5 (Ch. 8) Desplegando y testeando código (Skaffold CI/CD)](#25-ch-8-desplegando-y-testeando-código-skaffold-cicd)
 
 
 ## Entornos de desarrollo y operaciones
@@ -656,7 +662,7 @@ ssh -i ~/.ssh/dftd -p 2222 bender@localhost
 - [ ] Curiosamente todavía podemos acceder con `vagrant ssh`... ¿No deberíamos caparlo?
 
 
-#### 1.7 (Ch. 4) Webapp & sudoers
+#### 1.7 (Ch. 4) Webapp & sudoers (con Jinja)
 
 
 ##### `web_application.yml`, `greeting.service`, `greeting.py` y `wsgi.py`
@@ -842,6 +848,551 @@ sudo less /var/log/ufw.log
 ```
 
 
+### Proyecto 2. Docker (en *Minikube*), Kubernetes y CI/CD pipelines
+
+##### 2.1 (Ch. 6) Instalación de minikube y docker-client
+
+En la misma máquina EX2511.
+
+Valores por defecto de `minikube start`: `--cpus=2 --memory='3900m' --disk-size='20g'`
+
+
+```bash
+cd /tmp
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube_latest_amd64.deb
+# sudo dpkg -i minikube_latest_amd64.deb
+cd -
+```
+
+Necesario iniciar minikube cada vez que queramos usarlo...
+
+```bash
+# minikube start --driver=virtualbox
+minikube start
+```
+<!--
+```log
+pabloqpacin@pop-os ~$ minikube start
+* minikube v1.33.1 on Debian bookworm/sid
+* Automatically selected the virtualbox driver. Other choices: none, ssh
+* Downloading VM boot image ...
+    > minikube-v1.33.1-amd64.iso....:  65 B / 65 B [---------] 100.00% ? p/s 0s
+    > minikube-v1.33.1-amd64.iso:  314.16 MiB / 314.16 MiB  100.00% 41.96 MiB p
+* Starting "minikube" primary control-plane node in "minikube" cluster
+* Downloading Kubernetes v1.30.0 preload ...
+    > preloaded-images-k8s-v18-v1...:  342.90 MiB / 342.90 MiB  100.00% 38.13 M
+* Creating virtualbox VM (CPUs=2, Memory=3900MB, Disk=20000MB) ...
+* Preparing Kubernetes v1.30.0 on Docker 26.0.2 ...
+  - Generating certificates and keys ...
+  - Booting up control plane ...
+  - Configuring RBAC rules ...
+* Configuring bridge CNI (Container Networking Interface) ...
+* Verifying Kubernetes components...
+  - Using image gcr.io/k8s-minikube/storage-provisioner:v5
+* Enabled addons: default-storageclass, storage-provisioner
+* kubectl not found. If you need it, try: 'minikube kubectl -- get pods -A'
+* Done! kubectl is now configured to use "minikube" cluster and "default" namespace by default
+```
+ -->
+
+```bash
+sudo apt install docker-ce-cli
+
+echo "eval $(minikube -p minikube docker-env)" >> ~/.zshrc || \
+echo "eval $(minikube -p minikube docker-env)" >> ~/.bashrc
+
+docker version
+```
+
+##### 2.2 Imagen Docker de aplicación `telnet-server`
+
+Contenido del directorio `telnet-server/`:
+
+```log
+*[main][~/devops_101]$ tree telnet-server
+ devops_101/telnet-server
+├──  container-tests
+│  └──  command-and-metadata-test.yaml
+├──  kubernetes
+│  ├──  deployment.yaml
+│  └──  service.yaml
+├──  metrics
+│  └──  server.go
+├──  telnet
+│  ├──  banner.go
+│  ├──  server.go
+│  └──  server_test.go
+├──  build.sh
+├──  Dockerfile
+├──  go.mod
+├──  go.sum
+├──  main.go
+└──  skaffold.yaml
+```
+
+Dockerfile para ***multistage** build*:
+
+```dockerfile
+# Build stage
+FROM golang:alpine AS build-env
+ADD . /
+RUN cd / && go build -o telnet-server
+
+# final stage
+FROM alpine:latest as final
+WORKDIR /app
+ENV TELNET_PORT 2323
+ENV METRIC_PORT 9000
+COPY --from=build-env /telnet-server /app/
+
+ENTRYPOINT ["./telnet-server"]
+```
+
+Comandos para crear la imagen y ejecutar un contenedor:
+
+```bash
+# Crear la imagen
+docker build -t dftd/telnet-server:v1 .
+
+docker image ls dftd/telnet-server:v1
+docker history dftd/telnet-server:v1
+
+# Ejecutar contenedor (instancia de la imagen)
+docker run -d --name telnet-server -p 2323:2323 dftd/telnet-server:v1
+# docker container ls -f name=telnet-server
+docker ps -f name=telnet-server
+```
+
+Otros comandos `docker` importantes:
+
+```bash
+docker exec telnet-server env
+docker exec -it telnet-server /bin/sh
+
+docker inspect telnet-server
+  # State
+  # NetworkSettings
+
+docker stats --no-stream dftd/telnet-server
+```
+
+##### 2.3 Demo de aplicación `telnet-server` (en Docker), revisión de logs
+
+Instalamos el cliente `telnet` si es necesario e iniciamos `minikube` y el contenedor si hemos apagado la máquina.
+
+```bash
+sudo apt install telnet
+
+minikube start
+
+docker ps -f name=telnet-server
+docker start telnet-server
+docker ps -f name=telnet-server
+```
+
+Nos conectamos al servidor telnet del contenedor.
+
+```log
+[pabloqpacin:~]$ telnet $(minikube ip) 2323
+Trying 192.168.59.100...
+Connected to 192.168.59.100.
+Escape character is '^]'.
+
+____________ ___________
+|  _  \  ___|_   _|  _  \
+| | | | |_    | | | | | |
+| | | |  _|   | | | | | |
+| |/ /| |     | | | |/ /
+|___/ \_|     \_/ |___/
+
+>d
+Fri Jul 12 16:13:34 +0000 UTC 2024
+>q
+Good Bye!
+Connection closed by foreign host.
+[pabloqpacin:~]$
+```
+
+Revisamos los logs.
+
+```logs
+~ ᐅ docker logs telnet-server
+telnet-server: 2024/07/11 18:44:41 telnet-server listening on [::]:2323
+telnet-server: 2024/07/11 18:44:41 Metrics endpoint listening on :9000
+telnet-server: 2024/07/12 16:10:42 Metrics endpoint listening on :9000
+telnet-server: 2024/07/12 16:10:42 telnet-server listening on [::]:2323
+telnet-server: 2024/07/12 16:11:45 [IP=192.168.59.1] New session
+telnet-server: 2024/07/12 16:13:34 [IP=192.168.59.1] Requested command: d
+telnet-server: 2024/07/12 16:13:37 [IP=192.168.59.1] User quit session
+
+~ ᐅ docker logs --tail=2 telnet-server
+~ ᐅ docker logs -f telnet-server
+```
+
+
+##### 2.4 (Ch. 7) Kubernetes: `deployment.yaml` y `service.yaml`
+
+
+<details>
+<summary>Archivos .yaml</summary>
+
+`deployment.yaml`:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telnet-server
+  labels:
+    app: telnet-server
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: telnet-server
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # how many pods we can add at a time
+      maxUnavailable: 0  # maxUnavailable define how many pods can be unavailable
+  template:
+    metadata:
+      labels:
+        app: telnet-server
+      annotations:
+        prometheus.io/scrape: 'true'
+        prometheus.io/port:   '9000'
+    spec:
+      containers:
+      - image: dftd/telnet-server:v1
+        imagePullPolicy: IfNotPresent
+        name: telnet-server
+        resources:
+          requests:
+            cpu: 0.1
+            memory: 1M
+          limits:
+            cpu: 0.5
+            memory: 100M
+        ports:
+        - containerPort: 2323
+          name: telnet
+        - containerPort: 9000
+          name: metrics
+```
+
+`service.yaml`:
+
+```yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: telnet-server
+  labels:
+    app: telnet-server
+spec:
+  ports:
+  - port: 2323
+    name: telnet
+    protocol: TCP
+    targetPort: 2323
+  selector:
+    app: telnet-server
+  type: LoadBalancer
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: telnet-server-metrics
+  labels:
+    app: telnet-server
+  annotations:
+      prometheus.io/scrape: 'true'
+      prometheus.io/port:   '9000'
+
+spec:
+  ports:
+  - name: metrics
+    port: 9000
+    protocol: TCP
+    targetPort: 9000
+  selector:
+    app: telnet-server
+  type: ClusterIP
+```
+
+</details>
+
+
+Puesta en marcha:
+
+```bash
+# minikube start
+
+minikube kubectl cluster-info
+  # Kubernetes control plane is running at https://192.168.59.100:8443
+  # CoreDNS is running at https://192.168.59.100:8443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+  # To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+
+minikube kubectl -- explain deployment.metadata.labels
+```
+```bash
+minikube kubectl -- apply -f telnet-server/kubernetes/
+
+minikube kubectl -- get deployments.apps telnet-server
+minikube kubectl -- get pods -l app=telnet-server
+
+minikube kubectl -- get services -l app=telnet-server
+```
+
+```bash
+minikube tunnel
+  # ...
+
+minikube kubectl -- get services telnet-server
+  # OJO con EXTERNAL-IP (10.105.23.82)
+
+telnet 10.105.23.82 2323
+  # d
+  # q
+
+# minikube kubectl -- get endpoints -l app=telnet-server
+```
+
+```bash
+minikube kubectl -- get pods -l app=telnet-server
+minikube kubectl -- delete pod <telnet-server-775769766-2bmd5>
+minikube kubectl -- get pods -l app=telnet-server
+```
+
+```bash
+# Para **escalar**: modificar los archivos bajo control de versiones y comando `apply`. Igualmente así se hace por comandos, pero mejor evitar esta práctica:
+minikube kubectl -- scale deployment telnet-server --replicas=3
+```
+
+```bash
+minikube kubectl -- logs
+minikube kubectl -- logs -l app=telnet-server --all-containers=true --prefix=true
+```
+
+
+##### 2.5 (Ch. 8) Desplegando y testeando código (Skaffold CI/CD)
+
+Primero instalamos **Skaffold**, **container-structure-test** y **Go**:
+
+```bash
+curl -Lo skaffold https://storage.googleapis.com/skaffold/releases/latest/skaffold-linux-amd64 && \
+sudo install skaffold /usr/local/bin/
+
+curl -LO https://github.com/GoogleContainerTools/container-structure-test/releases/latest/download/container-structure-test-linux-amd64 && \
+chmod +x container-structure-test-linux-amd64 && \
+sudo mv container-structure-test-linux-amd64 /usr/local/bin/container-structure-test
+
+sudo rm -rf /usr/local/go && \
+sudo tar -C /usr/local -xzf go1.22.5.linux-amd64.tar.gz
+if echo $PATH | grep -qv /usr/local/go/bin; then
+    echo -e "\nexport PATH=$PATH:/usr/local/go/bin" ~/.zshrc || \
+    echo -e "\nexport PATH=$PATH:/usr/local/go/bin" ~/.bashrc
+fi
+```
+
+Revisamos el archivo `telnet-server/skaffold.yaml`:
+
+```yaml
+apiVersion: skaffold/v2beta19
+kind: Config
+build:
+  local: {}
+  artifacts:
+  - image: dftd/telnet-server
+test:
+- image: dftd/telnet-server
+  custom:
+  - command: go test ./... -v
+  structureTests:
+  - ./container-tests/command-and-metadata-test.yaml
+deploy:
+  kubectl:
+    manifests:
+    - kubernetes/*
+```
+
+Revisamos `telnet-server/container-tests/command-and-metadata-test.yaml`:
+
+```yaml
+schemaVersion: 2.0.0
+commandTests:
+  - name: "telnet-server"
+    command: "./telnet-server"
+    args: ["-i"]
+    expectedOutput: ["telnet port :2323\nMetrics Port: :9000"]
+metadataTest:
+  envVars:
+    - key: TELNET_PORT
+      value: 2323
+    - key: METRIC_PORT
+      value: 9000
+  entrypoint: ["./telnet-server"]
+  workdir: "/app"
+```
+
+<!-- build.sh -->
+
+Ponemos las herramientas a prueba:
+
+```bash
+cd telnet-server
+skaffold dev --cleanup=false
+  # Dejar la terminal abierta
+```
+
+<!--
+```log
+[telnet-server] skaffold dev --cleanup=false                                                              devel  ✱
+Generating tags...
+ - dftd/telnet-server -> dftd/telnet-server:064aa01-dirty
+Checking cache...
+ - dftd/telnet-server: Not found. Building
+Starting build...
+Found [minikube] context, using local docker daemon.
+Building [dftd/telnet-server]...
+Target platforms: [linux/amd64]
+Sending build context to Docker daemon   29.7kB
+Step 1/9 : FROM golang:alpine AS build-env
+alpine: Pulling from library/golang
+ec99f8b99825: Already exists
+8bfb7f89ddd5: Already exists
+32a2f51ff3dd: Already exists
+935834aa092a: Already exists
+4f4fb700ef54: Already exists
+Digest: sha256:8c9183f715b0b4eca05b8b3dbf59766aaedb41ec07477b132ee2891ac0110a07
+Status: Downloaded newer image for golang:alpine
+ ... a60a31a97fdb
+Step 2/9 : ADD . /
+ ... 38b276ee5b5e
+Step 3/9 : RUN cd / && go build -o telnet-server
+ ... Running in cbcf9236a84d
+go: downloading github.com/prometheus/client_golang v1.6.0
+go: downloading github.com/beorn7/perks v1.0.1
+go: downloading github.com/cespare/xxhash/v2 v2.1.1
+go: downloading github.com/golang/protobuf v1.4.0
+go: downloading github.com/prometheus/client_model v0.2.0
+go: downloading github.com/prometheus/common v0.9.1
+go: downloading github.com/prometheus/procfs v0.0.11
+go: downloading google.golang.org/protobuf v1.21.0
+go: downloading github.com/matttproud/golang_protobuf_extensions v1.0.1
+go: downloading golang.org/x/sys v0.0.0-20200420163511-1957bb5e6d1f
+ ... 3eab8907fb04
+Step 4/9 : FROM alpine:latest as final
+latest: Pulling from library/alpine
+ec99f8b99825: Already exists
+Digest: sha256:b89d9c93e9ed3597455c90a0b88a8bbb5cb7188438f70953fede212a0c4394e0
+Status: Downloaded newer image for alpine:latest
+ ... a606584aa9aa
+Step 5/9 : WORKDIR /app
+ ... Running in a78041e13836
+ ... a5800a1d2290
+Step 6/9 : ENV TELNET_PORT 2323
+ ... Running in 8f25e7e7e30d
+ ... 3480f217d941
+Step 7/9 : ENV METRIC_PORT 9000
+ ... Running in 74bf178e922a
+ ... 1545c2369c8b
+Step 8/9 : COPY --from=build-env /telnet-server /app/
+ ... 5ff7451e75f3
+Step 9/9 : ENTRYPOINT ["./telnet-server"]
+ ... Running in 2d72c86cd620
+ ... f64eee4f97d7
+Successfully built f64eee4f97d7
+Successfully tagged dftd/telnet-server:064aa01-dirty
+Build [dftd/telnet-server] succeeded
+Starting test...
+Testing images...
+
+=======================================================
+====== Test file: command-and-metadata-test.yaml ======
+=======================================================
+=== RUN: Command Test: telnet-server
+--- PASS
+duration: 383.16803ms
+stdout: telnet port :2323
+Metrics Port: :9000
+
+=== RUN: Metadata Test
+--- PASS
+duration: 0s
+
+=======================================================
+======================= RESULTS =======================
+=======================================================
+Passes:      2
+Failures:    0
+Duration:    383.16803ms
+Total tests: 2
+
+PASS
+Running custom test command: "go test ./... -v"
+go: downloading github.com/stretchr/testify v1.4.0
+go: downloading github.com/davecgh/go-spew v1.1.1
+go: downloading github.com/stretchr/objx v0.1.1
+go: downloading gopkg.in/yaml.v2 v2.2.8
+go: downloading github.com/pmezard/go-difflib v1.0.0
+?       telnet-server   [no test files]
+?       telnet-server/metrics   [no test files]
+=== RUN   TestServerRun
+Mocked charge notification function
+    server_test.go:23: PASS:    Run()
+--- PASS: TestServerRun (0.00s)
+PASS
+ok      telnet-server/telnet    0.006s
+Command finished successfully.
+Tags used in deployment:
+ - dftd/telnet-server -> dftd/telnet-server:f64eee4f97d7a6e0c3dcd6daf4d6b103ea1d50e34eebfdaf5c192fd34e3d4f88
+Starting deploy...
+ - deployment.apps/telnet-server configured
+ - service/telnet-server configured
+ - service/telnet-server-metrics configured
+Waiting for deployments to stabilize...
+ - deployment/telnet-server is ready.
+Deployments stabilized in 3.122 seconds
+Listing files to watch...
+ - dftd/telnet-server
+Press Ctrl+C to exit
+Watching for changes...
+[telnet-server] telnet-server: 2024/07/18 15:15:04 Metrics endpoint listening on :9000
+[telnet-server] telnet-server: 2024/07/18 15:15:04 telnet-server listening on [::]:2323
+[telnet-server] telnet-server: 2024/07/18 15:15:06 telnet-server listening on [::]:2323
+[telnet-server] telnet-server: 2024/07/18 15:15:06 Metrics endpoint listening on :9000
+```
+-->
+
+Hacemos cambios en el código:
+
+```bash
+sed -i 's/colorGreen, b/colorYellow, b/' telnet-server/telnet/banner.go
+
+kubectl get services telnet-server
+  # 10.105.23.82 (EXTERNAL-IP)
+
+telnet 10.105.23.82 2323
+
+# AHORA SALE AMARILLO, se han actualizado los pods
+```
+
+Kubernetes rollout...
+
+```bash
+kubectl rollout history deployment
+# kubectl rollout undo deployment telnet-server --to-revision=1
+```
+
+
+
+
+
+
+<!-- ##### 2.4 (Ch. 7) Kubernetes... -->
 
 
 <!-- ### Proyecto 2. Terraform -->
