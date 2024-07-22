@@ -29,6 +29,7 @@
         - [2.2 Imagen Docker de aplicación `telnet-server`](#22-imagen-docker-de-aplicación-telnet-server)
         - [2.3 Demo de aplicación `telnet-server` (en Docker), revisión de logs](#23-demo-de-aplicación-telnet-server-en-docker-revisión-de-logs)
         - [2.4 (Ch. 7) Kubernetes: `deployment.yaml` y `service.yaml`](#24-ch-7-kubernetes-deploymentyaml-y-serviceyaml)
+        - [2.5 (Ch. 8) Desplegando y testeando código (Skaffold CI/CD)](#25-ch-8-desplegando-y-testeando-código-skaffold-cicd)
 
 
 ## Entornos de desarrollo y operaciones
@@ -1174,6 +1175,219 @@ minikube kubectl -- scale deployment telnet-server --replicas=3
 minikube kubectl -- logs
 minikube kubectl -- logs -l app=telnet-server --all-containers=true --prefix=true
 ```
+
+
+##### 2.5 (Ch. 8) Desplegando y testeando código (Skaffold CI/CD)
+
+Primero instalamos **Skaffold**, **container-structure-test** y **Go**:
+
+```bash
+curl -Lo skaffold https://storage.googleapis.com/skaffold/releases/latest/skaffold-linux-amd64 && \
+sudo install skaffold /usr/local/bin/
+
+curl -LO https://github.com/GoogleContainerTools/container-structure-test/releases/latest/download/container-structure-test-linux-amd64 && \
+chmod +x container-structure-test-linux-amd64 && \
+sudo mv container-structure-test-linux-amd64 /usr/local/bin/container-structure-test
+
+sudo rm -rf /usr/local/go && \
+sudo tar -C /usr/local -xzf go1.22.5.linux-amd64.tar.gz
+if echo $PATH | grep -qv /usr/local/go/bin; then
+    echo -e "\nexport PATH=$PATH:/usr/local/go/bin" ~/.zshrc || \
+    echo -e "\nexport PATH=$PATH:/usr/local/go/bin" ~/.bashrc
+fi
+```
+
+Revisamos el archivo `telnet-server/skaffold.yaml`:
+
+```yaml
+apiVersion: skaffold/v2beta19
+kind: Config
+build:
+  local: {}
+  artifacts:
+  - image: dftd/telnet-server
+test:
+- image: dftd/telnet-server
+  custom:
+  - command: go test ./... -v
+  structureTests:
+  - ./container-tests/command-and-metadata-test.yaml
+deploy:
+  kubectl:
+    manifests:
+    - kubernetes/*
+```
+
+Revisamos `telnet-server/container-tests/command-and-metadata-test.yaml`:
+
+```yaml
+schemaVersion: 2.0.0
+commandTests:
+  - name: "telnet-server"
+    command: "./telnet-server"
+    args: ["-i"]
+    expectedOutput: ["telnet port :2323\nMetrics Port: :9000"]
+metadataTest:
+  envVars:
+    - key: TELNET_PORT
+      value: 2323
+    - key: METRIC_PORT
+      value: 9000
+  entrypoint: ["./telnet-server"]
+  workdir: "/app"
+```
+
+<!-- build.sh -->
+
+Ponemos las herramientas a prueba:
+
+```bash
+cd telnet-server
+skaffold dev --cleanup=false
+  # Dejar la terminal abierta
+```
+
+<!--
+```log
+[telnet-server] skaffold dev --cleanup=false                                                              devel  ✱
+Generating tags...
+ - dftd/telnet-server -> dftd/telnet-server:064aa01-dirty
+Checking cache...
+ - dftd/telnet-server: Not found. Building
+Starting build...
+Found [minikube] context, using local docker daemon.
+Building [dftd/telnet-server]...
+Target platforms: [linux/amd64]
+Sending build context to Docker daemon   29.7kB
+Step 1/9 : FROM golang:alpine AS build-env
+alpine: Pulling from library/golang
+ec99f8b99825: Already exists
+8bfb7f89ddd5: Already exists
+32a2f51ff3dd: Already exists
+935834aa092a: Already exists
+4f4fb700ef54: Already exists
+Digest: sha256:8c9183f715b0b4eca05b8b3dbf59766aaedb41ec07477b132ee2891ac0110a07
+Status: Downloaded newer image for golang:alpine
+ ... a60a31a97fdb
+Step 2/9 : ADD . /
+ ... 38b276ee5b5e
+Step 3/9 : RUN cd / && go build -o telnet-server
+ ... Running in cbcf9236a84d
+go: downloading github.com/prometheus/client_golang v1.6.0
+go: downloading github.com/beorn7/perks v1.0.1
+go: downloading github.com/cespare/xxhash/v2 v2.1.1
+go: downloading github.com/golang/protobuf v1.4.0
+go: downloading github.com/prometheus/client_model v0.2.0
+go: downloading github.com/prometheus/common v0.9.1
+go: downloading github.com/prometheus/procfs v0.0.11
+go: downloading google.golang.org/protobuf v1.21.0
+go: downloading github.com/matttproud/golang_protobuf_extensions v1.0.1
+go: downloading golang.org/x/sys v0.0.0-20200420163511-1957bb5e6d1f
+ ... 3eab8907fb04
+Step 4/9 : FROM alpine:latest as final
+latest: Pulling from library/alpine
+ec99f8b99825: Already exists
+Digest: sha256:b89d9c93e9ed3597455c90a0b88a8bbb5cb7188438f70953fede212a0c4394e0
+Status: Downloaded newer image for alpine:latest
+ ... a606584aa9aa
+Step 5/9 : WORKDIR /app
+ ... Running in a78041e13836
+ ... a5800a1d2290
+Step 6/9 : ENV TELNET_PORT 2323
+ ... Running in 8f25e7e7e30d
+ ... 3480f217d941
+Step 7/9 : ENV METRIC_PORT 9000
+ ... Running in 74bf178e922a
+ ... 1545c2369c8b
+Step 8/9 : COPY --from=build-env /telnet-server /app/
+ ... 5ff7451e75f3
+Step 9/9 : ENTRYPOINT ["./telnet-server"]
+ ... Running in 2d72c86cd620
+ ... f64eee4f97d7
+Successfully built f64eee4f97d7
+Successfully tagged dftd/telnet-server:064aa01-dirty
+Build [dftd/telnet-server] succeeded
+Starting test...
+Testing images...
+
+=======================================================
+====== Test file: command-and-metadata-test.yaml ======
+=======================================================
+=== RUN: Command Test: telnet-server
+--- PASS
+duration: 383.16803ms
+stdout: telnet port :2323
+Metrics Port: :9000
+
+=== RUN: Metadata Test
+--- PASS
+duration: 0s
+
+=======================================================
+======================= RESULTS =======================
+=======================================================
+Passes:      2
+Failures:    0
+Duration:    383.16803ms
+Total tests: 2
+
+PASS
+Running custom test command: "go test ./... -v"
+go: downloading github.com/stretchr/testify v1.4.0
+go: downloading github.com/davecgh/go-spew v1.1.1
+go: downloading github.com/stretchr/objx v0.1.1
+go: downloading gopkg.in/yaml.v2 v2.2.8
+go: downloading github.com/pmezard/go-difflib v1.0.0
+?       telnet-server   [no test files]
+?       telnet-server/metrics   [no test files]
+=== RUN   TestServerRun
+Mocked charge notification function
+    server_test.go:23: PASS:    Run()
+--- PASS: TestServerRun (0.00s)
+PASS
+ok      telnet-server/telnet    0.006s
+Command finished successfully.
+Tags used in deployment:
+ - dftd/telnet-server -> dftd/telnet-server:f64eee4f97d7a6e0c3dcd6daf4d6b103ea1d50e34eebfdaf5c192fd34e3d4f88
+Starting deploy...
+ - deployment.apps/telnet-server configured
+ - service/telnet-server configured
+ - service/telnet-server-metrics configured
+Waiting for deployments to stabilize...
+ - deployment/telnet-server is ready.
+Deployments stabilized in 3.122 seconds
+Listing files to watch...
+ - dftd/telnet-server
+Press Ctrl+C to exit
+Watching for changes...
+[telnet-server] telnet-server: 2024/07/18 15:15:04 Metrics endpoint listening on :9000
+[telnet-server] telnet-server: 2024/07/18 15:15:04 telnet-server listening on [::]:2323
+[telnet-server] telnet-server: 2024/07/18 15:15:06 telnet-server listening on [::]:2323
+[telnet-server] telnet-server: 2024/07/18 15:15:06 Metrics endpoint listening on :9000
+```
+-->
+
+Hacemos cambios en el código:
+
+```bash
+sed -i 's/colorGreen, b/colorYellow, b/' telnet-server/telnet/banner.go
+
+kubectl get services telnet-server
+  # 10.105.23.82 (EXTERNAL-IP)
+
+telnet 10.105.23.82 2323
+
+# AHORA SALE AMARILLO, se han actualizado los pods
+```
+
+Kubernetes rollout...
+
+```bash
+kubectl rollout history deployment
+# kubectl rollout undo deployment telnet-server --to-revision=1
+```
+
+
 
 
 
