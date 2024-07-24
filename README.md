@@ -25,11 +25,16 @@
       - [1.8 (Ch. 5)  `ufw` firewall](#18-ch-5--ufw-firewall)
         - [`firewall.yml`](#firewallyml)
     - [Proyecto 2. Docker (en *Minikube*), Kubernetes y CI/CD pipelines](#proyecto-2-docker-en-minikube-kubernetes-y-cicd-pipelines)
-        - [2.1 (Ch. 6) Instalación de minikube y docker-client](#21-ch-6-instalación-de-minikube-y-docker-client)
-        - [2.2 Imagen Docker de aplicación `telnet-server`](#22-imagen-docker-de-aplicación-telnet-server)
-        - [2.3 Demo de aplicación `telnet-server` (en Docker), revisión de logs](#23-demo-de-aplicación-telnet-server-en-docker-revisión-de-logs)
-        - [2.4 (Ch. 7) Kubernetes: `deployment.yaml` y `service.yaml`](#24-ch-7-kubernetes-deploymentyaml-y-serviceyaml)
-        - [2.5 (Ch. 8) Desplegando y testeando código (Skaffold CI/CD)](#25-ch-8-desplegando-y-testeando-código-skaffold-cicd)
+      - [2.1 (Ch. 6) Instalación de minikube y docker-client](#21-ch-6-instalación-de-minikube-y-docker-client)
+      - [2.2 Imagen Docker de aplicación `telnet-server`](#22-imagen-docker-de-aplicación-telnet-server)
+      - [2.3 Demo de aplicación `telnet-server` (en Docker), revisión de logs](#23-demo-de-aplicación-telnet-server-en-docker-revisión-de-logs)
+      - [2.4 (Ch. 7) Kubernetes: `deployment.yaml` y `service.yaml`](#24-ch-7-kubernetes-deploymentyaml-y-serviceyaml)
+      - [2.5 (Ch. 8) Desplegando y testeando código (Skaffold CI/CD)](#25-ch-8-desplegando-y-testeando-código-skaffold-cicd)
+      - [2.6 (Ch. 9) Observabilidad y Monitoreo](#26-ch-9-observabilidad-y-monitoreo)
+        - [Instalación del stack y consulta de las interfaces web](#instalación-del-stack-y-consulta-de-las-interfaces-web)
+        - [Explicación del entorno (métricas)](#explicación-del-entorno-métricas)
+        - [Habilitar alertas por correo](#habilitar-alertas-por-correo)
+      - [2.7 (Ch. 10) Troubleshooting](#27-ch-10-troubleshooting)
 
 
 ## Entornos de desarrollo y operaciones
@@ -850,7 +855,7 @@ sudo less /var/log/ufw.log
 
 ### Proyecto 2. Docker (en *Minikube*), Kubernetes y CI/CD pipelines
 
-##### 2.1 (Ch. 6) Instalación de minikube y docker-client
+#### 2.1 (Ch. 6) Instalación de minikube y docker-client
 
 En la misma máquina EX2511.
 
@@ -904,7 +909,7 @@ echo "eval $(minikube -p minikube docker-env)" >> ~/.bashrc
 docker version
 ```
 
-##### 2.2 Imagen Docker de aplicación `telnet-server`
+#### 2.2 Imagen Docker de aplicación `telnet-server`
 
 Contenido del directorio `telnet-server/`:
 
@@ -976,7 +981,7 @@ docker inspect telnet-server
 docker stats --no-stream dftd/telnet-server
 ```
 
-##### 2.3 Demo de aplicación `telnet-server` (en Docker), revisión de logs
+#### 2.3 Demo de aplicación `telnet-server` (en Docker), revisión de logs
 
 Instalamos el cliente `telnet` si es necesario e iniciamos `minikube` y el contenedor si hemos apagado la máquina.
 
@@ -1030,7 +1035,7 @@ telnet-server: 2024/07/12 16:13:37 [IP=192.168.59.1] User quit session
 ```
 
 
-##### 2.4 (Ch. 7) Kubernetes: `deployment.yaml` y `service.yaml`
+#### 2.4 (Ch. 7) Kubernetes: `deployment.yaml` y `service.yaml`
 
 
 <details>
@@ -1177,7 +1182,7 @@ minikube kubectl -- logs -l app=telnet-server --all-containers=true --prefix=tru
 ```
 
 
-##### 2.5 (Ch. 8) Desplegando y testeando código (Skaffold CI/CD)
+#### 2.5 (Ch. 8) Desplegando y testeando código (Skaffold CI/CD)
 
 Primero instalamos **Skaffold**, **container-structure-test** y **Go**:
 
@@ -1385,10 +1390,83 @@ Kubernetes rollout...
 ```bash
 kubectl rollout history deployment
 # kubectl rollout undo deployment telnet-server --to-revision=1
+
+kubectl get replicaset -l app=telnet-server
+# kubectl delete replicaset telnet-server-<hash>
 ```
 
+---
+
+#### 2.6 (Ch. 9) Observabilidad y Monitoreo
+
+##### Instalación del stack y consulta de las interfaces web
+
+- Ojo
+
+```bash
+cd ~/devops_101
+kubectl apply -R -f monitoring/
+```
+
+- Con estos comandos se abren en el navegador web las páginas de administración de Grafana y Alert-manager
+
+```bash
+minikube -n monitoring service grafana-service
+minikube -n monitoring service alertmanager-service
+minikube -n monitoring service prometheus-service
+```
+
+- Revisamos lo de *bbs-warrior*...
+
+```bash
+kubectl get cronjobs.batch -l app=bbs-warrior
+kubectl get pods -l app=bbs-warrior
+```
+
+##### Explicación del entorno (métricas)
+
+Básicamente **Prometheus** recaba métricas con consultas PromQL como estas (se pueden introducir en la interfaz web):
+
+```foo
+# Ejemplo de consulta (Prometheus)
+rate(telnet_server_connection_errors_total{job="kubernetes-pods"}[2m])
+
+# Ejemplo de alerta (Prometheus)
+sum(rate(telnet_server_connection_errors_total{job="kubernetes-pods"}[2m])) > 2
+```
+
+Estas métricas se envían a **Grafana** para visualizarlo todo mejor mediante *dashboards*.
+
+También se envían a **alertmanager**, donde habilitamos notificaciones por email.
+
+Para este proyecto se usa **bbs-warrior** para generar aleatoriamente tráfico y peticiones, permitiendo recoger métricas y disparar alertas.
+
+##### Habilitar alertas por correo
+
+Hay que modificar el archivo `monitoring/alertmanager/configmap.yaml`. Si tenemos 2FA en la cuenta de Google, revisar [esto](https://support.google.com/accounts/answer/185833/) para crear '*app passwords*'.
+
+```bash
+# EDITAR EL ARCHIVO
+sed -i 's/#//g' monitoring/alertmanager/configmap.yaml
+
+GMAIL_USERNAME='pabloqpacin'
+GMAIL_PASSWORD=''
+read -p "${GMAIL_USERNAME} gmail password: " GMAIL_PASSWORD
+sed -i "s/GMAIL_USERNAME/${GMAIL_USERNAME}/g" monitoring/alertmanager/configmap.yaml
+sed -i "s/GMAIL_PASSWORD/${GMAIL_PASSWORD}/g" monitoring/alertmanager/configmap.yaml
+
+sed -i 's/- receiver: none/- receiver: email/' monitoring/alertmanager/configmap.yaml
 
 
+# APLICAR LA CONFIGURACIÓN
+kubectl apply -f monitoring/alertmanger/configmap.yaml
+kubectl -n monitoring rollout restart deployment alertmanager
+
+# REVISAR LOGS
+kubectl -n monitoring logs -l app=alertmanager
+```
+
+#### 2.7 (Ch. 10) Troubleshooting
 
 
 
